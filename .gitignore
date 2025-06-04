@@ -192,3 +192,14 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# ───────────────────────────────────────────────────────────────────────────
+# DATA FILES (CSV, JSON, GeoJSON, databases, etc.)
+# ───────────────────────────────────────────────────────────────────────────
+*.csv
+*.tsv
+*.json
+*.geojson
+*.db
+*.sqlite
+*.sqlite3
