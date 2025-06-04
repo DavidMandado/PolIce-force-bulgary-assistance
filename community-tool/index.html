@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Community Portal</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body id="index-page">
+    <header class="site-header">
+        <img src="public/images/metrobadge.png" alt="Metro Police" class="logo" />
+        <span class="site-title">Metropolitan Police</span>
+        <nav>
+            <a href="feedback.html" class="active">Give Feedback</a>
+            <a href="dashboard.html">View Data</a>
+        </nav>
+    </header>
+    <div class="container" id="main-container">
+        <h1 class="front">Welcome to the Community Portal</h1>
+        <div class="access-options">
+            <button class="accessbot" id="police-btn">Police Officer Access</button>
+            <button class="accessbot" id="citizen-btn">Citizen Access</button>
+        </div>
+    </div>
+
+    <!-- Demo Login Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <span id="close-modal" class="close">&times;</span>
+            <h2>Citizen Login (Demo)</h2>
+            <form id="login-form">
+                <label>ID Number:</label>
+                <input type="text" id="user-id" required>
+                <label>Password:</label>
+                <input type="password" id="password" required>
+                <button type="submit">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

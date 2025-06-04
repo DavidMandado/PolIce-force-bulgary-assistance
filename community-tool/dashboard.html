@@ -1,0 +1,139 @@
+<!-- dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Community Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+        integrity="sha256-sA+e2poJLuV7QYbN8V+vB1p2jT6g0f3p4lzYxNakmfQ="
+        crossorigin="" />
+</head>
+
+<body>
+  <header class="site-header">
+    <img src="public/images/metrobadge.png" alt="Metro Police" class="logo" />
+    <span class="site-title">Metropolitan Police</span>
+    <nav>
+      <a href="feedback.html">Give Feedback</a>
+      <a href="dashboard.html" class="active">View Data</a>
+    </nav>
+  </header>
+
+<div class="dashboard-container">
+  <div class="dashboard-grid">
+    <div class="panel chart-panel">
+      <h2>Burglary Trends</h2>
+      <canvas id="lineChart"></canvas>
+    </div>
+
+    <div class="panel seasonal-panel">
+      <h2>Seasonal Pattern</h2>
+      <canvas id="seasonalChart"></canvas>
+    </div>
+
+    <div class="panel map-panel">
+      <h2>Ward-Level Heatmap</h2>
+      <div id="map"></div>
+    </div>
+
+    <div class="panel recent-panel">
+      <h2>Last 6 Months</h2>
+      <div id="recentMap"></div>
+    </div>
+  </div>
+</div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+          integrity="sha256-mMBPkw0Yg/j5Pn0Bt3QlHhg/85vG3W5tAM3s65RjOcM="
+          crossorigin=""></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    // 1) Line Chart
+    const ctx = document.getElementById('lineChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+        datasets: [{
+          label: 'Monthly Burglaries',
+          data: [30,25,40,35,50,45,55,60,48,38,32,28],
+          borderColor: '#01579B',
+          backgroundColor: 'rgba(2,136,209,0.3)',
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: { responsive: true }
+    });
+
+    // 2) Seasonal Bar Chart
+    const ctx2 = document.getElementById('seasonalChart').getContext('2d');
+    fetch('data/seasonal_counts.json')
+      .then(res => res.json())
+      .then(season => {
+        new Chart(ctx2, {
+          type: 'bar',
+          data: {
+            labels: Object.keys(season),
+            datasets: [{
+              label: 'Avg Monthly Burglaries',
+              data: Object.values(season),
+              backgroundColor: 'rgba(2,136,209,0.6)'
+            }]
+          },
+          options: { responsive: true }
+        });
+      });
+
+    // 3) Ward-Level Leaflet
+    const map = L.map('map').setView([51.5074, -0.1278], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    fetch('data/ward_choro.json')
+      .then(r => r.json())
+      .then(geojson => {
+        L.geoJSON(geojson, {
+          style: f => ({
+            fillColor: getColor(f.properties.count),
+            weight: 1, color: '#fff', fillOpacity: 0.7
+          })
+        }).addTo(map);
+      });
+
+    // 4) Last 6 Months Heatmap
+    const recentMap = L.map('recentMap').setView([51.5074, -0.1278], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(recentMap);
+
+    fetch('data/ward_6months.json')
+      .then(r => r.json())
+      .then(geojson => {
+        L.geoJSON(geojson, {
+          style: f => ({
+            fillColor: getColor(f.properties.count),
+            weight: 1, color: '#fff', fillOpacity: 0.7
+          })
+        }).addTo(recentMap);
+      });
+
+    function getColor(d) {
+      return d > 50 ? '#0D47A1' :
+             d > 40 ? '#1976D2' :
+             d > 30 ? '#2196F3' :
+             d > 20 ? '#64B5F6' :
+             d > 10 ? '#BBDEFB' :
+                      '#E3F2FD';
+    }
+  </script>
+</body>
+</html>

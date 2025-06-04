@@ -1,0 +1,90 @@
+<!-- feedback.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Community Safety Feedback</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body id="feedback-page">
+    <header class="site-header">
+        <img src="public/images/metrobadge.png" alt="Metro Police" class="logo" />
+        <span class="site-title">Metropolitan Police</span>
+        <nav>
+            <a href="feedback.html" class="active">Give Feedback</a>
+            <a href="dashboard.html">View Data</a>
+        </nav>
+    </header>
+    <div id="feedback-container" class="container">
+        <h1>Safety Feedback</h1>
+        <h5 id="disclaimer">
+            Any answers and content discussed is encrypted and anonymized on submission and will be kept that way
+        </h5>
+
+        <form id="survey-form">
+            <!-- Question 1: Safety rating -->
+            <div class="form-control" id="first-question">
+                <label>1. How safe do you feel in your area?
+                    <small>(1 = Very Unsafe, 5 = Very Safe)</small>
+                </label>
+                <div class="rating-options">
+                    <input type="radio" id="safety1" name="safety" value="1" required>
+                    <label for="safety1">1</label>
+                    <input type="radio" id="safety2" name="safety" value="2">
+                    <label for="safety2">2</label>
+                    <input type="radio" id="safety3" name="safety" value="3">
+                    <label for="safety3">3</label>
+                    <input type="radio" id="safety4" name="safety" value="4">
+                    <label for="safety4">4</label>
+                    <input type="radio" id="safety5" name="safety" value="5">
+                    <label for="safety5">5</label>
+                </div>
+            </div>
+
+            <!-- Question 2: Response time satisfaction -->
+            <div class="form-control">
+                <label>2. How satisfied are you with police response times?
+                    <small>(1 = Very Unsatisfied, 5 = Very Satisfied)</small>
+                </label>
+                <div class="rating-options">
+                    <input type="radio" id="resp1" name="response" value="1" required>
+                    <label for="resp1">1</label>
+                    <input type="radio" id="resp2" name="response" value="2">
+                    <label for="resp2">2</label>
+                    <input type="radio" id="resp3" name="response" value="3">
+                    <label for="resp3">3</label>
+                    <input type="radio" id="resp4" name="response" value="4">
+                    <label for="resp4">4</label>
+                    <input type="radio" id="resp5" name="response" value="5">
+                    <label for="resp5">5</label>
+                </div>
+            </div>
+
+            <!-- Question 3: Open text -->
+            <div class="form-control">
+                <label for="concerns">3. What concerns you most about safety?</label>
+                <textarea id="concerns" name="concerns" rows="3" placeholder="Your thoughts…"></textarea>
+            </div>
+
+            <!-- Question 4: Open text -->
+            <div class="form-control">
+                <label for="other">4. Any other comments or suggestions?</label>
+                <textarea id="other" name="other" rows="2" placeholder="Optional"></textarea>
+            </div>
+
+            <button type="submit">Submit Feedback</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('survey-form')
+            .addEventListener('submit', function (e) {
+                e.preventDefault();
+                window.location.href = 'dashboard.html';
+            });
+    </script>
+</body>
+
+</html>

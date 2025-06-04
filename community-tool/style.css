@@ -1,0 +1,281 @@
+/* style.css */
+/* PAGE LAYOUT */
+body {
+    margin: 0;
+    font-family: sans-serif;
+    background: beige;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+
+    /* center in viewport */
+    height: auto;
+    margin: 100px auto;
+    padding: 1rem;
+
+    max-width: 600px;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+}
+
+h1,
+h2 {
+    margin-top: 0;
+}
+
+button {
+    padding: 0.5rem 1rem;
+    margin: 0.5rem;
+    background: #007bff;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #0056b3;
+}
+
+/* MODAL (if present elsewhere) */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 10;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background: #fff;
+    margin: 10% auto;
+    padding: 2rem;
+    width: 300px;
+    position: relative;
+    border-radius: 4px;
+}
+
+.close {
+    position: absolute;
+    right: 1rem;
+    top: 0.5rem;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+/* FEEDBACK FORM BASE */
+#feedback-page {
+    background-image: url('public/images/metrobadge.png');
+    background-repeat: repeat;
+    background-size: 300px 300px;
+}
+
+#feedback-container {
+    padding: 3.4rem;
+}
+
+/* FORM CONTROLS */
+form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-control {
+    text-align: left;
+    margin-bottom: 3rem;
+}
+
+.form-control label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+    color: #0277bd;
+}
+
+.form-control label small {
+    font-weight: normal;
+    color: #666;
+}
+
+.form-control textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    resize: vertical;
+}
+
+#first-question {
+    margin-top: 3rem
+}
+
+/* RATING PILLS */
+.rating-options {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.rating-options input[type="radio"] {
+    display: none;
+}
+
+.rating-options label {
+    flex: 1;
+    background: #e1f5fe;
+    border: 2px solid #0277bd;
+    border-radius: 4px;
+    padding: 0.5rem 0;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    text-align: center;
+    color: #0277bd;
+    font-weight: bold;
+}
+
+.rating-options input[type="radio"]:checked+label,
+.rating-options label:hover {
+    background: #0277bd;
+    color: #fff;
+}
+
+/* DISCLAIMER */
+#disclaimer {
+    margin: auto;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    /* two columns */
+    gap: 1rem;
+}
+
+.panel {
+    background: #ffffff;
+    padding: 1rem;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.panel canvas {
+    width: 100% !important;
+    height: 300px !important;
+}
+
+#map,
+#recentMap {
+    width: 100%;
+    height: 400px;
+}
+
+.dashboard-container {
+    max-width: 1200px;
+    margin: 1.5rem auto;
+    padding: 1rem;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+
+.front {
+    align-items: center;
+}
+
+.accessbot {
+    border-radius: 5px;
+}
+
+#welcome-cont {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    height: auto;
+}
+
+#index-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: beige;
+}
+
+#index-page #main-container {
+    max-width: 700px;
+    margin: 0;
+    height: 140px;
+    padding: 70px;
+}
+
+.site-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #01579B;
+    padding: 0.5rem 1rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.site-header .logo {
+    height: 40px;
+}
+
+.site-header nav {
+    margin-right: 5rem;
+}
+
+.site-header nav a {
+    color: #FFD700;
+    margin-left: 1.7rem;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.site-header nav a.active {
+    text-decoration: underline;
+}
+
+.site-header nav a:hover {
+    text-decoration: underline;
+    color: #f6ff00;
+}
+
+.site-header .site-title {
+    color: #FFD700;
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin-left: -60rem;
+}
+
+
+body {
+    padding-top: 60p
+}
+
+/* INDEX: disable scrolling, lock full‐screen height */
+body#index-page {
+    overflow: hidden;
+    height: 100vh;
+}
+
+html, body {
+    overflow-x: hidden;
+}
