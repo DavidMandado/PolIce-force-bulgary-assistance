@@ -1,5 +1,8 @@
 import os
 import json
+import base64
+import io
+import numpy as np
 
 import dash
 from dash import dcc, html
@@ -9,14 +12,19 @@ from dash.exceptions import PreventUpdate
 import os, pandas as pd
 import geopandas as gpd
 import plotly.express as px
+from shapely import Point
 from shapely.geometry import shape
 
 from dash import dash_table
 
+import joblib
+from scipy.stats import entropy
+
 # ─── Paths ────────────────────────────────────────────────────────────────────
 
 # Centralized data folder
-DATA_DIR = r"C:/Users/20232726/Desktop/me/PolIce-force-bulgary-assistance/data"
+DATA_DIR = r"../data"
+MODEL_DIR = r"../models"
 
 # The “master” CSV with all LSOA × month burglary counts and features
 MASTER_CSV_PATH  = os.path.join(DATA_DIR, "crime_fixed_data.csv")
@@ -29,6 +37,13 @@ LSOA_GEOJSON     = os.path.join(DATA_DIR, "LSOAs.geojson")
 PRED_CSV_PATH    = os.path.join(DATA_DIR, "burglary_next_month_forecast.csv")
 ALLOC_CSV_PATH   = os.path.join(DATA_DIR, "abbey_ward_patrol_schedule.csv")
 
+# model paths
+MODEL_PATH = os.path.join(MODEL_DIR, "xgb_burglary_model.pkl")
+SCALER_PATH = os.path.join(MODEL_DIR, "robust_scaler.pkl")
+
+# get model and scaler
+model = joblib.load(MODEL_PATH)
+scaler = joblib.load(SCALER_PATH)
 
 # ─── 1) Read both GeoJSONs into Python dicts ─────────────────────────────────
 
@@ -279,7 +294,7 @@ def toggle_mode_controls(mode):
     Input("upload-file", "contents"),
     State("upload-file", "filename"),
 )
-def handle_upload(contents, filename):
+def handle_upload(contents, filename):    
     if contents is None:
         raise PreventUpdate
 
@@ -287,17 +302,22 @@ def handle_upload(contents, filename):
     decoded = base64.b64decode(content_string)
     try:
         df_new = pd.read_csv(io.StringIO(decoded.decode("utf-8")))
+        print("df new created")
+        clean_df = clean_new_dataset(df_new)
+        print("clean df created")
+        update_model_with_new_data(clean_df)
+        print("model updated")
     except Exception:
         return html.Div("Error: could not read uploaded CSV.")
 
-    if os.path.exists(MASTER_CSV_PATH):
-        df_master = pd.read_csv(MASTER_CSV_PATH)
-        df_combined = pd.concat([df_master, df_new], ignore_index=True)
-    else:
-        df_combined = df_new
+    # if os.path.exists(MASTER_CSV_PATH):
+    #     df_master = pd.read_csv(MASTER_CSV_PATH)
+    #     df_combined = pd.concat([df_master, df_new], ignore_index=True)
+    # else:
+    #     df_combined = df_new
 
-    df_combined.to_csv(MASTER_CSV_PATH, index=False)
-    return html.Div(f"Uploaded “{filename}” → master.csv updated.")
+    # df_combined.to_csv(MASTER_CSV_PATH, index=False)
+    # return html.Div(f"Uploaded “{filename}” → master.csv updated.")
 
 
 @app.callback(
@@ -374,18 +394,63 @@ def handle_selection(map_click, back_click, search_click, search_value):
     State("past-range",      "value"),
 )
 def update_maps(n_clicks, selected_ward, level, mode, past_range):
+    if mode == "pred":
+        # Load your predictions CSV
+        df_pred = pd.read_csv(PRED_CSV_PATH)
+        # Expect columns: ['lsoa_code', 'predicted_count']
+
+        if level == "ward":
+            # Map LSOA → ward then aggregate
+            df_pred["ward_code"] = df_pred.lsoa_code.map(lsoa_to_ward)
+            wc = (
+                df_pred.groupby("ward_code")["predicted_burglary"]
+                       .sum().reset_index(name="count")
+            )
+            # Ensure all wards displayed
+            all_w = [f["properties"]["GSS_Code"] for f in ward_geo["features"]]
+            dfw = pd.DataFrame({"code": all_w}).merge(
+                wc.rename(columns={"ward_code":"code", "predicted_burglary":"count"}), on="code", how="left"
+            )
+            dfw["count"] = dfw["count"].fillna(0).astype(int)
+
+            # Choropleth of predicted counts by ward
+            fig = px.choropleth_map(
+                dfw, geojson=ward_geo, featureidkey="properties.GSS_Code",
+                locations="code", color="count",
+                color_continuous_scale="oryel", opacity=0.7,
+                map_style="open-street-map",
+                center={"lat":51.5074, "lon":-0.1278}, zoom=10,
+                labels={"count":"Predicted Burglaries"},
+            )
+            fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+            # Hide LSOA & table in ward overview
+            return fig, fig, FULL_MAP_STYLE, {"display":"none"}, html.Div()
+
+        # LSOA view (full London)
+        df_ls = df_pred.rename(columns={"lsoa_code":"code", "predicted_burglary":"count"})
+        fig = px.choropleth_map(
+            df_ls, geojson=lsoa_geo, featureidkey="properties.LSOA11CD",
+            locations="code", color="count",
+            color_continuous_scale="oryel", opacity=0.7,
+            map_style="open-street-map",
+            center={"lat":51.5074, "lon":-0.1278}, zoom=10,
+            labels={"count":"Predicted Burglaries"},
+        )
+        fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+        return fig, fig, {"display":"none"}, FULL_MAP_STYLE, html.Div()
+    
     # ── 1) Load & filter master CSV ──────────────────────────────────────
-    df = pd.read_csv(MASTER_CSV_PATH, parse_dates=["year_month"])
+    df = pd.read_csv(MASTER_CSV_PATH, parse_dates=["month"])
     y0, y1 = int(past_range[0]), int(past_range[1])
-    df = df[(df.year_month.dt.year >= y0) & (df.year_month.dt.year <= y1)]
+    df = df[(df.month.dt.year >= y0) & (df.month.dt.year <= y1)]
     # restrict to London LSOAs
     df = df[df.lsoa_code.isin(lsoa_to_ward)]
     if df.empty:
-        blank = px.choropleth_mapbox(
+        blank = px.choropleth_map(
             pd.DataFrame({"code":[], "count":[]}),
             geojson=ward_geo, featureidkey="properties.GSS_Code",
             locations="code", color="count",
-            mapbox_style="open-street-map",
+            map_style="open-street-map",
             center={"lat":51.5074,"lon":-0.1278}, zoom=10
         )
         blank.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
@@ -406,11 +471,11 @@ def update_maps(n_clicks, selected_ward, level, mode, past_range):
         )
         dfw["count"] = dfw["count"].fillna(0).astype(int)
 
-        ward_fig = px.choropleth_mapbox(
+        ward_fig = px.choropleth_map(
             dfw, geojson=ward_geo, featureidkey="properties.GSS_Code",
             locations="code", color="count", opacity=0.7,
             color_continuous_scale="oryel",
-            mapbox_style="open-street-map",
+            map_style="open-street-map",
             center={"lat":51.5074,"lon":-0.1278}, zoom=10,
             labels={"count":"Burglary Count"},
         )
@@ -443,11 +508,11 @@ def update_maps(n_clicks, selected_ward, level, mode, past_range):
         minx, miny, maxx, maxy = shape(ward_geom).bounds
         center_l = {"lat":(miny+maxy)/2, "lon":(minx+maxx)/2}
 
-        lsoa_fig = px.choropleth_mapbox(
+        lsoa_fig = px.choropleth_map(
             fl, geojson=geo_l, featureidkey="properties.LSOA11CD",
             locations="code", color="count", opacity=0.7,
             color_continuous_scale="oryel",
-            mapbox_style="open-street-map",
+            map_style="open-street-map",
             center=center_l, zoom=12,
             labels={"count":"Burglary Count"},
         )
@@ -480,11 +545,11 @@ def update_maps(n_clicks, selected_ward, level, mode, past_range):
           .sum().reset_index(name="count")
           .rename(columns={"lsoa_code":"code"})
     )
-    lsoaf = px.choropleth_mapbox(
+    lsoaf = px.choropleth_map(
         df_ls, geojson=lsoa_geo, featureidkey="properties.LSOA11CD",
         locations="code", color="count", opacity=0.7,
         color_continuous_scale="oryel",
-        mapbox_style="open-street-map",
+        map_style="open-street-map",
         center={"lat":51.5074,"lon":-0.1278}, zoom=10,
         labels={"count":"Burglary Count"},
     )
@@ -499,6 +564,232 @@ def update_maps(n_clicks, selected_ward, level, mode, past_range):
         html.Div()            # empty alloc container
     )
 
+def update_model_with_new_data(new_df: pd.DataFrame):
+    exclude_cols = {
+        "lsoa_code", "month", "year_month", "crime_type",
+        "latitude", "longitude", "burglary_count", "crime_count"
+    }
+    features = [c for c in new_df.columns if c not in exclude_cols and new_df[c].dtype in [np.int64, np.float64]]
+    target_col = "burglary_count"
+    
+    expected = set(scaler.feature_names_in_)
+    actual = set(features)
+    print("Missing:", expected - actual)
+    print("Extra:", actual - expected)
+
+    print("Model and scaler loaded from disk.")
+    X_new = scaler.transform(new_df[features])
+    print("x good")
+    y_new = new_df[target_col].values
+    print(f"Updating model with {len(X_new)} new samples...")
+    model.fit(X_new, y_new, xgb_model=model)
+    joblib.dump(model, MODEL_PATH)
+    print(f"Model updated and saved to {MODEL_PATH}")
+
+# TODO: make the datasets work with the code, getting errors
+def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
+    df.columns = (
+        df.columns
+        .str.strip()
+        .str.lower()
+        .str.replace(" ", "_")
+        .str.replace(r"[^\w_]", "", regex=True)
+    )
+    # Filter for London LSOAs
+    df = df[df["lsoa_code"].astype(str).str.startswith("E01")]
+    print("Filtered to London LSOAs:", df["lsoa_code"].nunique(), "unique LSOAs remaining")
+
+    # Load and clean stop and search data
+    stop_and_search_data = pd.read_csv("../data/stopandsearch2019.csv", skiprows=2, on_bad_lines='skip', engine="python")
+    stop_and_search_data.columns = stop_and_search_data.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
+    stop_and_search_data["date"] = pd.to_datetime(stop_and_search_data["date"], errors="coerce")
+    stop_and_search_data.dropna(subset=["date", "longitude", "latitude"], inplace=True)
+    stop_and_search_data["month"] = stop_and_search_data["date"].dt.to_period("M").dt.to_timestamp()
+
+    # Attach LSOA to stop and search
+    lsoa_gdf = gpd.read_file("../data/LSOAs.geojson")
+    stop_and_search_data["geometry"] = stop_and_search_data.apply(lambda row: Point(row["longitude"], row["latitude"]), axis=1)
+    stop_gdf = gpd.GeoDataFrame(stop_and_search_data, geometry="geometry", crs="EPSG:4326").to_crs(lsoa_gdf.crs)
+    stop_with_lsoa = gpd.sjoin(stop_gdf, lsoa_gdf[["LSOA11CD", "geometry"]], how="left", predicate="within")
+    stop_with_lsoa.rename(columns={"LSOA11CD": "lsoa_code"}, inplace=True)
+
+    # Aggregate stop and search
+    stop_search_counts = stop_with_lsoa.dropna(subset=["lsoa_code"]).groupby(["lsoa_code", "month"]).size().reset_index(name="stop_and_search_count")
+
+    # Clean and process crime data
+    df.columns = df.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
+    df.drop(columns=["reported_by", "falls_within", "context"], errors='ignore', inplace=True)
+    df["month"] = pd.to_datetime(df["month"], format="%Y-%m")
+    df.dropna(subset=["lsoa_code", "month", "crime_type"], inplace=True)
+    df["crime_type"] = df["crime_type"].str.lower()
+
+    # Create complete grid
+    all_lsoas = df["lsoa_code"].unique()
+    all_months = pd.date_range(df["month"].min(), df["month"].max(), freq="MS")
+    full_index = pd.MultiIndex.from_product([all_lsoas, all_months], names=["lsoa_code", "month"])
+    full_df = pd.DataFrame(index=full_index).reset_index()
+
+    # Crime counts
+    burglary_counts = df[df["crime_type"] == "burglary"].groupby(["lsoa_code", "month"]).size().reset_index(name="burglary_count")
+    crime_counts_total = df.groupby(["lsoa_code", "month"]).size().reset_index(name="crime_count")
+
+    # Merge counts
+    full_df = full_df.merge(burglary_counts, on=["lsoa_code", "month"], how="left")
+    full_df = full_df.merge(crime_counts_total, on=["lsoa_code", "month"], how="left")
+    full_df[["burglary_count", "crime_count"]] = full_df[["burglary_count", "crime_count"]].fillna(0).astype(int)
+
+    # Other crimes
+    other_crimes = df[df["crime_type"] != "burglary"].groupby(["lsoa_code", "month", "crime_type"]).size().reset_index(name="count")
+    other_pivot = other_crimes.pivot(index=["lsoa_code", "month"], columns="crime_type", values="count").fillna(0).reset_index()
+    full_df = full_df.merge(other_pivot, on=["lsoa_code", "month"], how="left")
+    full_df.fillna(0, inplace=True)
+
+    # Coordinates
+    lsoa_coords = df.dropna(subset=["longitude", "latitude"]).groupby("lsoa_code")[["longitude", "latitude"]].mean().reset_index()
+    full_df = full_df.merge(lsoa_coords, on="lsoa_code", how="left")
+
+    # Merge stop and search
+    full_df = full_df.merge(stop_search_counts, on=["lsoa_code", "month"], how="left")
+    full_df["stop_and_search_count"] = full_df["stop_and_search_count"].fillna(0)
+
+    # Lags and rolling stats
+    full_df.sort_values(["lsoa_code", "month"], inplace=True)
+    grouped = full_df.groupby("lsoa_code")
+    for lag in [1, 2, 3, 6, 12]:
+        full_df[f"lag_{lag}"] = grouped["burglary_count"].shift(lag)
+    for window in [3, 6, 12]:
+        full_df[f"rolling_mean_{window}"] = grouped["burglary_count"].shift(1).rolling(window).mean()
+        full_df[f"rolling_std_{window}"] = grouped["burglary_count"].shift(1).rolling(window).std()
+        full_df[f"rolling_sum_{window}"] = grouped["burglary_count"].shift(1).rolling(window).sum()
+
+    # Time features
+    full_df["month_num"] = full_df["month"].dt.month
+    full_df["quarter"] = full_df["month"].dt.quarter
+    full_df["month_sin"] = np.sin(2 * np.pi * full_df["month_num"] / 12)
+    full_df["month_cos"] = np.cos(2 * np.pi * full_df["month_num"] / 12)
+    full_df["is_winter"] = full_df["month_num"].isin([12, 1, 2]).astype(int)
+    full_df["is_holiday_season"] = full_df["month_num"].isin([11, 12]).astype(int)
+
+    # Merge IMD and population
+    imd = pd.read_csv("../data/ID-2019-for-London.csv", delimiter=";")
+    imd.columns = imd.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
+    print("IMD columns:", imd.columns.tolist())
+    imd = imd.rename(columns={
+        "lsoa_code_(2011)": "lsoa_code",
+        "index_of_multiple_deprivation_imd_decile_where_1_is_most_deprived_10_of_lsoas": "imd_decile_2019",
+        "income_decile_where_1_is_most_deprived_10_of_lsoas": "income_decile_2019",
+        "employment_decile_where_1_is_most_deprived_10_of_lsoas": "employment_decile_2019",
+        "crime_decile_where_1_is_most_deprived_10_of_lsoas": "crime_decile_2019",
+        "health_deprivation_and_disability_decile_where_1_is_most_deprived_10_of_lsoas": "health_decile_2019"
+    })
+    full_df = full_df.merge(imd, on="lsoa_code", how="left")
+
+    pop = pd.read_csv("../data/Mid-2021-LSOA-2021.csv", delimiter=";")
+    pop.columns = pop.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
+    pop = pop.rename(columns={"lsoa_2021_code": "lsoa_code", "total": "population"})
+    full_df = full_df.merge(pop[["lsoa_code", "population"]], on="lsoa_code", how="left")
+
+    # Derived features
+    full_df["log_pop"] = np.log1p(full_df["population"])
+    full_df["crime_per_capita"] = full_df["lag_1"] / (full_df["population"] + 1)
+    full_df["stop_rate"] = full_df["stop_and_search_count"] / (full_df["population"] + 1)
+    full_df["imd_pop_interaction"] = full_df["imd_decile_2019"] * full_df["log_pop"]
+    fill_cols = [c for c in full_df.columns if c.startswith(("lag_", "rolling_", "delta_", "momentum"))]
+    full_df[fill_cols] = full_df[fill_cols].fillna(0)
+
+    # Object of search feature engineering
+    stop_with_lsoa["object_of_search"] = stop_with_lsoa["object_of_search"].str.lower()
+    weapon_counts = stop_with_lsoa[stop_with_lsoa["object_of_search"].str.contains("weapon", na=False)].groupby(["lsoa_code", "month"]).size().reset_index(name="weapon_search_count")
+    drug_counts = stop_with_lsoa[stop_with_lsoa["object_of_search"].str.contains("drug", na=False)].groupby(["lsoa_code", "month"]).size().reset_index(name="drug_search_count")
+    full_df = full_df.merge(weapon_counts, on=["lsoa_code", "month"], how="left")
+    full_df = full_df.merge(drug_counts, on=["lsoa_code", "month"], how="left")
+    full_df[["weapon_search_count", "drug_search_count"]] = full_df[["weapon_search_count", "drug_search_count"]].fillna(0).astype(int)
+
+    # Drop unnecessary columns
+    full_df.drop(columns=[col for col in full_df.columns if "rolling_sum_" in col] + ["month_num", "stop_rate"], inplace=True, errors="ignore")
+
+    # IMD interactions
+    imd_cols = ["imd_decile_2019", "income_decile_2019", "employment_decile_2019", "crime_decile_2019", "health_decile_2019"]
+    for col in imd_cols:
+        full_df[col] = full_df[col].astype("category")
+        full_df[f"{col}_x_sin"] = full_df[col].cat.codes * full_df["month_sin"]
+        full_df[f"{col}_x_cos"] = full_df[col].cat.codes * full_df["month_cos"]
+        full_df[f"{col}_x_quarter"] = full_df[col].cat.codes * full_df["quarter"]
+        
+    full_df["month"] = pd.to_datetime(full_df["month"])
+    full_df["year_month"] = full_df["month"].dt.to_period("M")
+    full_df = full_df[full_df["burglary_count"].notna() & (full_df["burglary_count"] >= 0)].copy()
+    full_df.sort_values(["lsoa_code", "month"], inplace=True)
+    full_df.reset_index(drop=True, inplace=True)
+
+    # add time features
+    for lag in [1, 3, 6, 12]:
+        col = f"crime_count_pct_change_{lag}m"
+        full_df[col] = full_df.groupby("lsoa_code")["crime_count"].pct_change(lag)
+        full_df[col] = full_df[col].replace([np.inf, -np.inf], np.nan).fillna(0)
+
+    full_df["month_num"] = full_df["month"].dt.month
+    full_df["month_sin"] = np.sin(2 * np.pi * full_df["month_num"] / 12)
+    full_df["month_cos"] = np.cos(2 * np.pi * full_df["month_num"] / 12)
+    full_df["quarter"] = full_df["month"].dt.quarter
+    full_df["is_holiday"] = full_df["month_num"].isin([11, 12]).astype(int)
+
+    if "crime_count_lag_1m" not in full_df.columns:
+        full_df["crime_count_lag_1m"] = full_df.groupby("lsoa_code")["crime_count"].shift(1).fillna(0)
+
+    if "crime_count_lag_3m" not in full_df.columns:
+        full_df["crime_count_lag_3m"] = full_df.groupby("lsoa_code")["crime_count"].shift(3).fillna(0)
+
+    # add interaction features
+    full_df["lag1_crime_x_pop"] = full_df["crime_count_lag_1m"] * full_df["population"]
+    full_df["lag3_crime_x_imd"] = full_df["crime_count_lag_3m"] * full_df["imd_decile_2019"].astype(float)
+
+    full_df["crime_volatility_3m"] = (
+        full_df.groupby("lsoa_code")["crime_count"]
+        .transform(lambda x: x.rolling(3, min_periods=1).std())
+        .fillna(0)
+    )
+
+    crime_types = [c for c in full_df.columns if c.startswith("crime_") and c.endswith("_count") and c != "burglary_count"]
+    crime_data = full_df[crime_types].to_numpy()
+
+    # Normalize rows (avoid division by zero)
+    row_sums = crime_data.sum(axis=1, keepdims=True)
+    row_sums[row_sums == 0] = 1  # to avoid division by zero
+    prob_matrix = crime_data / row_sums
+
+    # Compute entropy for each row
+    full_df["crime_entropy"] = entropy(prob_matrix.T, base=np.e)
+
+    # months since last burglary
+    def time_since_burglary(series):
+        last_seen = -1
+        result = []
+        for val in series:
+            if val > 0:
+                last_seen = 0
+            elif last_seen >= 0:
+                last_seen += 1
+            result.append(last_seen if last_seen >= 0 else np.nan)
+        return result
+
+    full_df["months_since_burglary"] = full_df.groupby("lsoa_code")["burglary_count"].transform(time_since_burglary).fillna(100)
+
+    # extended interactions
+    full_df["lag1_x_entropy"] = full_df["crime_count_lag_1m"] * full_df["crime_entropy"]
+    full_df["lag3_x_entropy"] = full_df["crime_count_lag_3m"] * full_df["crime_entropy"]
+
+    full_df["entropy_x_sin"] = full_df["crime_entropy"] * full_df["month_sin"]
+    full_df["entropy_x_cos"] = full_df["crime_entropy"] * full_df["month_cos"]
+
+    full_df["entropy_x_imd2019"] = full_df["crime_entropy"] * full_df["imd_decile_2019"].astype(float)
+    full_df["volatility_x_sin"] = full_df["crime_volatility_3m"] * full_df["month_sin"]
+    full_df["volatility_x_cos"] = full_df["crime_volatility_3m"] * full_df["month_cos"]
+
+    full_df["stop_x_imd2019"] = full_df["stop_and_search_count"] * full_df["imd_decile_2019"].astype(float)
+    full_df["imd2019_x_msb"] = full_df["imd_decile_2019"].astype(float) * full_df["months_since_burglary"]
+
+    return full_df
 
 if __name__ == "__main__":
     app.run(debug=True)
