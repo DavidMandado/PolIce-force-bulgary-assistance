@@ -151,59 +151,9 @@ feat_imp_df = pd.DataFrame({
 print(feat_imp_df.head(20))
 
 # save predictions
-df_out = df.loc[test, ["lsoa_code", "year_month", "burglary_count"]].copy()
-df_out["pred"] = final_model.predict(X_test)
-df_out.to_csv("data/burglary_pred_tuned.csv", index=False)
-
-# predicting the next month
-latest_month = df["month"].max()
-next_month = latest_month + MonthBegin(1)
-
-latest_df = df[df["month"] == latest_month].copy()
-next_df = latest_df.copy()
-next_df["month"] = next_month
-next_df["year_month"] = next_df["month"].dt.to_period("M")
-
-# update features for predictions
-next_df["month_num"] = next_df["month"].dt.month
-next_df["month_sin"] = np.sin(2 * np.pi * next_df["month_num"] / 12)
-next_df["month_cos"] = np.cos(2 * np.pi * next_df["month_num"] / 12)
-next_df["quarter"] = next_df["month"].dt.quarter
-next_df["is_holiday"] = next_df["month_num"].isin([11, 12]).astype(int)
-
-next_df["crime_count_lag_1m"] = latest_df["crime_count"]
-next_df["crime_count_lag_3m"] = df.groupby("lsoa_code")["crime_count"].transform(
-    lambda x: x.shift(1).rolling(3).mean()
-).groupby(df["lsoa_code"]).transform("last").reindex(latest_df.index).fillna(0)
-
-next_df["lag1_crime_x_pop"] = next_df["crime_count_lag_1m"] * next_df["population"]
-next_df["lag3_crime_x_imd"] = next_df["crime_count_lag_3m"] * next_df["imd_decile_2019"].astype(float)
-
-next_df["months_since_burglary"] = latest_df["months_since_burglary"] + 1
-next_df.loc[latest_df["burglary_count"] > 0, "months_since_burglary"] = 0
-
-next_df["lag1_x_entropy"] = next_df["crime_count_lag_1m"] * latest_df["crime_entropy"]
-next_df["lag3_x_entropy"] = next_df["crime_count_lag_3m"] * latest_df["crime_entropy"]
-
-next_df["entropy_x_sin"] = latest_df["crime_entropy"] * next_df["month_sin"]
-next_df["entropy_x_cos"] = latest_df["crime_entropy"] * next_df["month_cos"]
-next_df["entropy_x_imd2019"] = latest_df["crime_entropy"] * next_df["imd_decile_2019"].astype(float)
-
-next_df["volatility_x_sin"] = latest_df["crime_volatility_3m"] * next_df["month_sin"]
-next_df["volatility_x_cos"] = latest_df["crime_volatility_3m"] * next_df["month_cos"]
-
-next_df["stop_x_imd2019"] = latest_df["stop_and_search_count"] * next_df["imd_decile_2019"].astype(float)
-next_df["imd2019_x_msb"] = next_df["imd_decile_2019"].astype(float) * next_df["months_since_burglary"]
-
-X_next = scaler.transform(next_df[features])
-
-# prediction
-next_df["predicted_burglary"] = final_model.predict(X_next)
-next_df["predicted_burglary"] = next_df["predicted_burglary"].clip(lower=0).round().astype(int)
-
-# export
-next_df[["lsoa_code", "year_month", "predicted_burglary"]].to_csv("data/burglary_next_month_forecast.csv", index=False)
-print("data/burglary_next_month_forecast.csv")
+# df_out = df.loc[test, ["lsoa_code", "year_month", "burglary_count"]].copy()
+# df_out["pred"] = final_model.predict(X_test)
+# df_out.to_csv("data/burglary_pred_tuned.csv", index=False)
 
 # === SAVE MODEL & SCALER ===
 MODEL_PATH = "models/xgb_burglary_model.pkl"
