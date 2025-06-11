@@ -3,6 +3,7 @@ import json
 import base64
 import io
 import numpy as np
+import traceback
 
 import dash
 from dash import dcc, html
@@ -309,17 +310,33 @@ def handle_upload(contents, filename):
         print("clean df created")
         update_model_with_new_data(clean_df)
         print("model updated")
-    except Exception:
+        
+        # # Append to master CSV
+        # if not os.path.exists(MASTER_CSV_PATH):
+        #     raise FileNotFoundError(f"Master CSV not found at {MASTER_CSV_PATH}.")
+        
+        # df_master = pd.read_csv(MASTER_CSV_PATH)
+        
+        # print("Difference: ", set(df_master.columns) - set(clean_df.columns))
+        # if df_master.columns != clean_df.columns:
+        #     raise ValueError("Uploaded CSV columns do not match master CSV columns.")
+        
+        # # Ensure no duplicates
+        # clean_df["month"] = pd.to_datetime(clean_df["month"])
+        # df_master["month"] = pd.to_datetime(df_master["month"])
+
+        # # Remove rows from clean_df that already exist in df_master (by lsoa_code + month)
+        # existing_index = df_master.set_index(["lsoa_code", "month"]).index
+        # clean_df = clean_df[~clean_df.set_index(["lsoa_code", "month"]).index.isin(existing_index)]
+        
+        # df_master = pd.concat([df_master, clean_df], ignore_index=True)
+        # df_master.to_csv(MASTER_CSV_PATH, index=False, mode='w')
+
+        return html.Div("New data uploaded successfully.")
+    except Exception as e:
+        print("Error details:", e)
+        traceback.print_exc()
         return html.Div("Error: could not read uploaded CSV.")
-
-    # if os.path.exists(MASTER_CSV_PATH):
-    #     df_master = pd.read_csv(MASTER_CSV_PATH)
-    #     df_combined = pd.concat([df_master, df_new], ignore_index=True)
-    # else:
-    #     df_combined = df_new
-
-    # df_combined.to_csv(MASTER_CSV_PATH, index=False)
-    # return html.Div(f"Uploaded “{filename}” → master.csv updated.")
 
 @app.callback(
     Output("sidebar", "style"),
@@ -390,7 +407,7 @@ from helper import save_prediction
     State("predict-month", "value")
 )
 def predict_month(n_clicks, month_str):
-    if n_clicks is 0:
+    if n_clicks == 0:
         raise PreventUpdate
     elif month_str is None:
         return html.Label("Please enter a month in YYYY-MM format.")
@@ -652,26 +669,22 @@ def update_maps(n_clicks, selected_ward, level, mode, past_range):
 def update_model_with_new_data(new_df: pd.DataFrame):
     exclude_cols = {
         "lsoa_code", "month", "year_month", "crime_type",
-        "latitude", "longitude", "burglary_count", "crime_count"
+        "latitude", "longitude", "burglary_count", "crime_count",
+        'crime_score', 'index_of_multiple_deprivation_imd_score', 'employment_score_rate',
+        'local_authority_district_code_2019', 'local_authority_district_name_2019',
+        'income_score_rate', 'barriers_to_housing_and_services_score', 'education_skills_and_training_score',
+        'quarter', 'month_num', 'lsoa_name', 'health_deprivation_and_disability_score', 'living_environment_score'
     }
-    features = [c for c in new_df.columns if c not in exclude_cols and new_df[c].dtype in [np.int64, np.float64]]
+    features = [c for c in new_df.columns if c not in exclude_cols]
     target_col = "burglary_count"
-    
-    expected = set(scaler.feature_names_in_)
-    actual = set(features)
-    print("Missing:", expected - actual)
-    print("Extra:", actual - expected)
 
-    print("Model and scaler loaded from disk.")
     X_new = scaler.transform(new_df[features])
     print("x good")
     y_new = new_df[target_col].values
-    print(f"Updating model with {len(X_new)} new samples...")
     model.fit(X_new, y_new, xgb_model=model)
     joblib.dump(model, MODEL_PATH)
     print(f"Model updated and saved to {MODEL_PATH}")
 
-# TODO: make the datasets work with the code, getting errors
 def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     df.columns = (
         df.columns
