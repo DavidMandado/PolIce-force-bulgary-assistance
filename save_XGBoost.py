@@ -91,7 +91,7 @@ exclude_cols = {
     "latitude", "longitude", "burglary_count", "crime_count"
 }
 features = [c for c in df.columns if c not in exclude_cols and df[c].dtype in [np.int64, np.float64]]
-
+print("Features:", features)
 # scaling
 scaler = RobustScaler()
 X = scaler.fit_transform(df[features])
