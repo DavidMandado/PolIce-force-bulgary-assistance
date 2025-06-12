@@ -24,8 +24,8 @@ from scipy.stats import entropy
 # ─── Paths ────────────────────────────────────────────────────────────────────
 
 # Centralized data folder
-DATA_DIR = r"../data"
-MODEL_DIR = r"../models"
+DATA_DIR = r"data"
+MODEL_DIR = r"models"
 
 # The “master” CSV with all LSOA × month burglary counts and features
 MASTER_CSV_PATH  = os.path.join(DATA_DIR, "crime_fixed_data.csv")
@@ -698,14 +698,14 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     print("Filtered to London LSOAs:", df["lsoa_code"].nunique(), "unique LSOAs remaining")
 
     # Load and clean stop and search data
-    stop_and_search_data = pd.read_csv("../data/stopandsearch2019.csv", skiprows=2, on_bad_lines='skip', engine="python")
+    stop_and_search_data = pd.read_csv("data/stopandsearch2019.csv", skiprows=2, on_bad_lines='skip', engine="python")
     stop_and_search_data.columns = stop_and_search_data.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
     stop_and_search_data["date"] = pd.to_datetime(stop_and_search_data["date"], errors="coerce")
     stop_and_search_data.dropna(subset=["date", "longitude", "latitude"], inplace=True)
     stop_and_search_data["month"] = stop_and_search_data["date"].dt.to_period("M").dt.to_timestamp()
 
     # Attach LSOA to stop and search
-    lsoa_gdf = gpd.read_file("../data/LSOAs.geojson")
+    lsoa_gdf = gpd.read_file("data/LSOAs.geojson")
     stop_and_search_data["geometry"] = stop_and_search_data.apply(lambda row: Point(row["longitude"], row["latitude"]), axis=1)
     stop_gdf = gpd.GeoDataFrame(stop_and_search_data, geometry="geometry", crs="EPSG:4326").to_crs(lsoa_gdf.crs)
     stop_with_lsoa = gpd.sjoin(stop_gdf, lsoa_gdf[["LSOA11CD", "geometry"]], how="left", predicate="within")
@@ -769,7 +769,7 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     full_df["is_holiday_season"] = full_df["month_num"].isin([11, 12]).astype(int)
 
     # Merge IMD and population
-    imd = pd.read_csv("../data/ID-2019-for-London.csv", delimiter=";")
+    imd = pd.read_csv("data/ID-2019-for-London.csv", delimiter=";")
     imd.columns = imd.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
     print("IMD columns:", imd.columns.tolist())
     imd = imd.rename(columns={
@@ -782,7 +782,7 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     })
     full_df = full_df.merge(imd, on="lsoa_code", how="left")
 
-    pop = pd.read_csv("../data/Mid-2021-LSOA-2021.csv", delimiter=";")
+    pop = pd.read_csv("data/Mid-2021-LSOA-2021.csv", delimiter=";")
     pop.columns = pop.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
     pop = pop.rename(columns={"lsoa_2021_code": "lsoa_code", "total": "population"})
     full_df = full_df.merge(pop[["lsoa_code", "population"]], on="lsoa_code", how="left")
