@@ -1,3 +1,5 @@
+import base64
+import io
 import os
 import json
 
@@ -375,9 +377,9 @@ def handle_selection(map_click, back_click, search_click, search_value):
 )
 def update_maps(n_clicks, selected_ward, level, mode, past_range):
     # ── 1) Load & filter master CSV ──────────────────────────────────────
-    df = pd.read_csv(MASTER_CSV_PATH, parse_dates=["year_month"])
+    df = pd.read_csv(MASTER_CSV_PATH, parse_dates=["month"])
     y0, y1 = int(past_range[0]), int(past_range[1])
-    df = df[(df.year_month.dt.year >= y0) & (df.year_month.dt.year <= y1)]
+    df = df[(df.month.dt.year >= y0) & (df.month.dt.year <= y1)]
     # restrict to London LSOAs
     df = df[df.lsoa_code.isin(lsoa_to_ward)]
     if df.empty:
