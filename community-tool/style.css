@@ -1,23 +1,30 @@
 /* style.css */
-/* PAGE LAYOUT */
+
+/* ————————————————
+   PAGE LAYOUT
+   ———————————————— */
 body {
     margin: 0;
     font-family: sans-serif;
     background: beige;
+    padding-top: 60px;
+    /* reserve space for fixed header */
 }
 
+html,
+body {
+    overflow-x: hidden;
+}
+
+/* center container on desktop */
 .container {
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     text-align: center;
-
-    /* center in viewport */
-    height: auto;
     margin: 100px auto;
     padding: 1rem;
-
     max-width: 600px;
     background: #fff;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -42,7 +49,9 @@ button:hover {
     background: #0056b3;
 }
 
-/* MODAL (if present elsewhere) */
+/* ————————————————
+   MODAL (if present)
+   ———————————————— */
 .modal {
     display: none;
     position: fixed;
@@ -71,7 +80,9 @@ button:hover {
     cursor: pointer;
 }
 
-/* FEEDBACK FORM BASE */
+/* ————————————————
+   FEEDBACK FORM BASE
+   ———————————————— */
 #feedback-page {
     background-image: url('public/images/metrobadge.png');
     background-repeat: repeat;
@@ -80,9 +91,12 @@ button:hover {
 
 #feedback-container {
     padding: 3.4rem;
+    margin-top: 30px
 }
 
-/* FORM CONTROLS */
+/* ————————————————
+   FORM CONTROLS
+   ———————————————— */
 form {
     width: 100%;
     display: flex;
@@ -112,16 +126,23 @@ form {
     border: 1px solid #ccc;
     border-radius: 4px;
     resize: vertical;
+    box-sizing: border-box;
+    /* global fix */
+    max-width: 100%;
+    overflow: auto;
 }
 
 #first-question {
-    margin-top: 3rem
+    margin-top: 3rem;
 }
 
-/* RATING PILLS */
+/* ————————————————
+   RATING PILLS
+   ———————————————— */
 .rating-options {
     display: flex;
     gap: 0.5rem;
+    flex-wrap: nowrap;
 }
 
 .rating-options input[type="radio"] {
@@ -147,17 +168,21 @@ form {
     color: #fff;
 }
 
-/* DISCLAIMER */
+/* ————————————————
+   DISCLAIMER
+   ———————————————— */
 #disclaimer {
     margin: auto;
     font-size: 0.9rem;
     color: #555;
 }
 
+/* ————————————————
+   DASHBOARD PANELS
+   ———————————————— */
 .dashboard-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    /* two columns */
     gap: 1rem;
 }
 
@@ -188,7 +213,9 @@ form {
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 }
 
-
+/* ————————————————
+   OTHER PAGES
+   ———————————————— */
 .front {
     align-items: center;
 }
@@ -220,6 +247,9 @@ form {
     padding: 70px;
 }
 
+/* ————————————————
+   FIXED HEADER
+   ———————————————— */
 .site-header {
     position: fixed;
     top: 0;
@@ -249,12 +279,12 @@ form {
     font-weight: bold;
 }
 
-.site-header nav a.active {
+.site-header nav a.active,
+.site-header nav a:hover {
     text-decoration: underline;
 }
 
 .site-header nav a:hover {
-    text-decoration: underline;
     color: #f6ff00;
 }
 
@@ -262,20 +292,58 @@ form {
     color: #FFD700;
     font-size: 1.25rem;
     font-weight: bold;
-    margin-left: -60rem;
+    /* remove any extreme margin here */
+    margin-left: 0;
 }
 
+/* ————————————————
+   MOBILE TWEAKS (<= 600px)
+   ———————————————— */
+@media (max-width: 600px) {
 
-body {
-    padding-top: 60p
-}
+    /* container + form spacing */
+    .container {
+        margin: 20px auto;
+        padding: 1rem;
+        max-width: 100%;
+    }
 
-/* INDEX: disable scrolling, lock full‐screen height */
-body#index-page {
-    overflow: hidden;
-    height: 100vh;
-}
+    #feedback-container {
+        padding: 1.5rem;
+        margin-top: 47px;
+    }
 
-html, body {
-    overflow-x: hidden;
+    /* allow rating pills to wrap */
+    .rating-options {
+        flex-wrap: wrap !important;
+        gap: 0.25rem;
+    }
+
+    .rating-options label {
+        flex: 1 1 30%;
+        margin: 0.25rem 0;
+        font-size: 1rem;
+    }
+
+    /* stack header vertically */
+    .site-header {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .site-header nav {
+        margin: 0.5rem 0 0;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .site-header nav a {
+        margin: 0.25rem 0.5rem;
+    }
+
+    /* dashboard single-column */
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        margin-top: 1rem;
+    }
 }
