@@ -45,9 +45,15 @@ df["crime_volatility_3m"] = (
 )
 
 crime_types = [c for c in df.columns if c.startswith("crime_") and c.endswith("_count") and c != "burglary_count"]
-df["crime_entropy"] = df[crime_types].div(df[crime_types].sum(axis=1), axis=0).apply(
-    lambda row: entropy(row.dropna()), axis=1
-)
+crime_data = df[crime_types].to_numpy()
+
+# Normalize rows (avoid division by zero)
+row_sums = crime_data.sum(axis=1, keepdims=True)
+row_sums[row_sums == 0] = 1  # to avoid division by zero
+prob_matrix = crime_data / row_sums
+
+# Compute entropy for each row
+df["crime_entropy"] = entropy(prob_matrix.T, base=np.e)
 
 # months since last burglary
 def time_since_burglary(series):
@@ -92,7 +98,7 @@ y = df["burglary_count"]
 # splits
 train = df["month"] < "2023-01-01"
 val = (df["month"] >= "2023-01-01") & (df["month"] < "2024-01-01")
-test = df["month"] >= "2025-01-01"
+test = df["month"] >= "2024-01-01"
 X_train, X_val, X_test = X[train], X[val], X[test]
 y_train, y_val, y_test = y[train], y[val], y[test]
 
