@@ -6,26 +6,25 @@ import numpy as np
 import traceback
 
 import dash
-from dash import dcc, html
+from dash import dcc, html, dash_table
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
-import os, pandas as pd
+import pandas as pd
 import geopandas as gpd
 import plotly.express as px
 from shapely import Point
 from shapely.geometry import shape
 
-from dash import dash_table
-
 import joblib
 from scipy.stats import entropy
+
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 
 # Centralized data folder
-DATA_DIR = r"data"
-MODEL_DIR = r"models"
+DATA_DIR = r"../data"
+MODEL_DIR = r"../models"
 
 # The “master” CSV with all LSOA × month burglary counts and features
 MASTER_CSV_PATH  = os.path.join(DATA_DIR, "crime_fixed_data.csv")
@@ -33,6 +32,12 @@ MASTER_CSV_PATH  = os.path.join(DATA_DIR, "crime_fixed_data.csv")
 # GeoJSON files (make sure these exist inside DATA_DIR)
 WARD_GEOJSON     = os.path.join(DATA_DIR, "wards.geojson")
 LSOA_GEOJSON     = os.path.join(DATA_DIR, "LSOAs.geojson")
+
+# Stop and search data
+STOP_SEARCH_PATH = os.path.join(DATA_DIR, "stopandsearch2019.csv")
+# ID data path
+ID_DATA_PATH = os.path.join(DATA_DIR, "ID-2019-for-London.csv")
+MID_LSOA_PATH = os.path.join(DATA_DIR, "Mid-2021-LSOA-2021.csv")
 
 # (Leave these for your predicted/allocation modes later)
 PRED_CSV_PATH    = os.path.join(DATA_DIR, "burglary_next_month_forecast.csv")
@@ -309,7 +314,6 @@ def handle_upload(contents, filename):
         clean_df = clean_new_dataset(df_new)
         print("clean df created")
         update_model_with_new_data(clean_df)
-        print("model updated")
         
         # # Append to master CSV
         # if not os.path.exists(MASTER_CSV_PATH):
@@ -486,14 +490,14 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     print("Filtered to London LSOAs:", df["lsoa_code"].nunique(), "unique LSOAs remaining")
 
     # Load and clean stop and search data
-    stop_and_search_data = pd.read_csv("data/stopandsearch2019.csv", skiprows=2, on_bad_lines='skip', engine="python")
+    stop_and_search_data = pd.read_csv(STOP_SEARCH_PATH, skiprows=2, on_bad_lines='skip', engine="python")
     stop_and_search_data.columns = stop_and_search_data.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
     stop_and_search_data["date"] = pd.to_datetime(stop_and_search_data["date"], errors="coerce")
     stop_and_search_data.dropna(subset=["date", "longitude", "latitude"], inplace=True)
     stop_and_search_data["month"] = stop_and_search_data["date"].dt.to_period("M").dt.to_timestamp()
 
     # Attach LSOA to stop and search
-    lsoa_gdf = gpd.read_file("data/LSOAs.geojson")
+    lsoa_gdf = gpd.read_file(LSOA_GEOJSON)
     stop_and_search_data["geometry"] = stop_and_search_data.apply(lambda row: Point(row["longitude"], row["latitude"]), axis=1)
     stop_gdf = gpd.GeoDataFrame(stop_and_search_data, geometry="geometry", crs="EPSG:4326").to_crs(lsoa_gdf.crs)
     stop_with_lsoa = gpd.sjoin(stop_gdf, lsoa_gdf[["LSOA11CD", "geometry"]], how="left", predicate="within")
@@ -557,7 +561,7 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     full_df["is_holiday_season"] = full_df["month_num"].isin([11, 12]).astype(int)
 
     # Merge IMD and population
-    imd = pd.read_csv("data/ID-2019-for-London.csv", delimiter=";")
+    imd = pd.read_csv(ID_DATA_PATH, delimiter=";")
     imd.columns = imd.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
     print("IMD columns:", imd.columns.tolist())
     imd = imd.rename(columns={
@@ -570,7 +574,7 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     })
     full_df = full_df.merge(imd, on="lsoa_code", how="left")
 
-    pop = pd.read_csv("data/Mid-2021-LSOA-2021.csv", delimiter=";")
+    pop = pd.read_csv(MID_LSOA_PATH, delimiter=";")
     pop.columns = pop.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
     pop = pop.rename(columns={"lsoa_2021_code": "lsoa_code", "total": "population"})
     full_df = full_df.merge(pop[["lsoa_code", "population"]], on="lsoa_code", how="left")
@@ -695,7 +699,7 @@ def generate_map(mode, selected_ward, level, past_range=None):
 
     df = df[df.lsoa_code.isin(lsoa_to_ward)]
     if df.empty:
-        blank = px.choropleth_mapbox(
+        blank = px.choropleth_map(
             pd.DataFrame({"code":[], "count":[]}),
             geojson=ward_geo, featureidkey="properties.GSS_Code",
             locations="code", color="count",
@@ -869,11 +873,11 @@ def generate_map(mode, selected_ward, level, past_range=None):
     lsoaf.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
 
     return (
-        lsoaf,
-        lsoaf,
-        {"display":"none"},
-        FULL_MAP_STYLE,
-        html.Div()
+        lsoaf,                # map-ward (hidden)
+        lsoaf,                # map-lsoa
+        {"display":"none"},   # ward style
+        FULL_MAP_STYLE,       # lsoa style
+        html.Div()            # empty alloc container
     )
 
 

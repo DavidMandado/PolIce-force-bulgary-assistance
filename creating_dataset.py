@@ -6,13 +6,13 @@ import glob
 from shapely.geometry import Point
 
 # Setup
-os.makedirs("data", exist_ok=True)
-crime_files = glob.glob("data/2019-to-2025/*.csv")
-print(f"Found {len(crime_files)} crime files to combine.")
+# os.makedirs("data", exist_ok=True)
+# crime_files = glob.glob("data/2019-to-2025/*.csv")
+# print(f"Found {len(crime_files)} crime files to combine.")
 
-# Combine crime data
-combined_data = pd.concat([pd.read_csv(f) for f in crime_files], ignore_index=True)
-combined_data.to_csv("data/combined_crime_2019-2025.csv", index=False, encoding="utf-8-sig")
+# # Combine crime data
+# combined_data = pd.concat([pd.read_csv(f) for f in crime_files], ignore_index=True)
+# combined_data.to_csv("data/combined_crime_2019-2025.csv", index=False, encoding="utf-8-sig")
 combined_data = pd.read_csv("data/combined_crime_2019-2025.csv")
 
 combined_data.columns = (
