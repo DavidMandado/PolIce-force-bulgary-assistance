@@ -18,12 +18,13 @@ from shapely.geometry import shape
 
 import joblib
 from scipy.stats import entropy
+import random
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 
 # Centralized data folder
-DATA_DIR = r"../data"
-MODEL_DIR = r"../models"
+DATA_DIR = r"C:\Users\mgshe\OneDrive - TU Eindhoven\Desktop\data challange\data"
+MODEL_DIR = r"C:\Users\mgshe\OneDrive - TU Eindhoven\Desktop\data challange\models"
 
 # The “master” CSV with all LSOA × month burglary counts and features
 MASTER_CSV_PATH  = os.path.join(DATA_DIR, "crime_fixed_data.csv")
@@ -878,6 +879,286 @@ def generate_map(mode, selected_ward, level, past_range=None):
         FULL_MAP_STYLE,       # lsoa style
         html.Div()            # empty alloc container
     )
+def Combine_LSOAs_Wards_predictions(selected_month): #Selected month is for what month of the predicted data we wanna try to schedule
+    lsoas = WARD_GEOJSON
+    wards = LSOA_GEOJSON
+    lsoas["LSOA_area"] = lsoas.geometry.area
+    joined = gpd.sjoin(lsoas, wards, how='inner', predicate='intersects')
+    overlap_counts = joined.groupby(joined.index).size()
+    lsoas_with_multiple_wards = overlap_counts[overlap_counts > 1]
+    overlap_lsoas_names = lsoas.loc[lsoas_with_multiple_wards.index, "LSOA11NM"].tolist()
+
+    lsoas_multi = lsoas.loc[lsoas_with_multiple_wards.index]
+    joined_multi = joined.loc[lsoas_with_multiple_wards.index]
+
+    joined_multi = joined_multi.merge(
+        wards[["geometry", "Name", "GSS_Code"]], left_on="index_right", right_index=True, suffixes=('', '_ward')
+    )
+
+    joined_multi["intersection_geom"] = joined_multi.apply(
+        lambda row: row.geometry.intersection(row.geometry_ward), axis=1
+    )
+
+    # Calculate intersection area
+    joined_multi["intersect_area"] = joined_multi["intersection_geom"].area
+
+    # Calculate percentage
+    joined_multi["pct_of_lsoa_area"] = joined_multi["intersect_area"] / joined_multi["LSOA_area"] * 100
+
+    result = joined_multi[[
+        "LSOA11CD", "LSOA11NM", "GSS_Code", "Name", "intersect_area", "LSOA_area", "pct_of_lsoa_area"
+    ]].rename(columns={"Name": "Ward", "GSS_Code": "Ward_code"})
+
+    result.sort_values(by="LSOA11CD")
+
+    ward_counts = result.groupby('LSOA11CD')['Ward'].nunique()
+
+    # Sort
+    df_sorted = result.sort_values(['LSOA11CD', 'pct_of_lsoa_area'], ascending=[True, False])
+
+    df_max = df_sorted.drop_duplicates(subset='LSOA11CD', keep='first').copy()
+    df_max['ward_count'] = df_max['LSOA11CD'].map(ward_counts)
+
+    df_max_sorted = df_max.sort_values(by='pct_of_lsoa_area', ascending=False)
+
+    single_ward_lsoa_ids = overlap_counts[overlap_counts == 1].index
+    single_ward_rows = joined.loc[single_ward_lsoa_ids]
+
+    single_ward_df = single_ward_rows[['LSOA11CD', 'LSOA11NM', 'GSS_Code', 'Name']].rename(
+        columns={'Name': 'Ward', 'GSS_Code': 'Ward_code'})
+    multi_ward_df = df_max[['LSOA11CD', 'LSOA11NM', 'Ward_code', 'Ward']]
+
+    # Combine
+    final_lsoa_ward_df = pd.concat([single_ward_df, multi_ward_df], ignore_index=True)
+
+    # Sort by Ward_code
+    final_lsoa_ward_df = final_lsoa_ward_df.sort_values('Ward_code').reset_index(drop=True)
+
+    # Get burglary per month per LSOA
+
+                            # use the output of the predictive model (or ig the historical data)
+    crimes = PRED_CSV_PATH
+
+    crimes['Month'] = pd.to_datetime(crimes['Month'])
+
+    crimes_cleaned = crimes.dropna(subset=['Longitude', 'Latitude'])
+
+    burglary = crimes_cleaned[crimes_cleaned['Crime type'] == 'Burglary'].copy()
+
+    gdf_crimes = gpd.GeoDataFrame(
+        crimes_cleaned,
+        geometry=gpd.points_from_xy(crimes_cleaned['Longitude'], crimes_cleaned['Latitude']),
+        crs="EPSG:4326"
+    )
+
+    gdf_crimes = gpd.sjoin(
+        gdf_crimes,
+        lsoas[['geometry', 'LSOA11NM']],
+        how='left',
+        predicate='within'
+    )
+
+    gdf_burglary = gpd.GeoDataFrame(
+        burglary,
+        geometry=gpd.points_from_xy(burglary['Longitude'], burglary['Latitude']),
+        crs="EPSG:4326"
+    )
+
+    gdf_burglary = gpd.sjoin(
+        gdf_burglary,
+        lsoas[['geometry', 'LSOA11NM']],
+        how='left',
+        predicate='within'
+    )
+
+    monthly_burglary_counts = (
+        gdf_burglary.dropna(subset=['LSOA11NM'])
+        .groupby(['LSOA11NM', gdf_burglary['Month'].dt.to_period('M')])
+        .size()
+        .reset_index(name='Burglary_Count')
+    )
+
+    monthly_burglary_counts['Month'] = monthly_burglary_counts['Month'].dt.to_timestamp()
+
+    burglary_pivot = monthly_burglary_counts.pivot(index='LSOA11NM', columns='Month', values='Burglary_Count').fillna(0)
+
+    full_lsoa_months = pd.MultiIndex.from_product(
+        [monthly_burglary_counts['LSOA11NM'].unique(), monthly_burglary_counts['Month'].unique()],
+        names=['LSOA11NM', 'Month']
+    )
+
+    monthly_burglary_counts = monthly_burglary_counts.set_index(['LSOA11NM', 'Month']).reindex(full_lsoa_months,
+                                                                                               fill_value=0).reset_index()
+
+    burglary_for_month = monthly_burglary_counts[
+        monthly_burglary_counts["Month"] == selected_month
+        ]
+
+    merged = final_lsoa_ward_df.merge(
+        burglary_for_month,
+        on="LSOA11NM",
+        how="left"
+    )
+
+    merged["Burglary_Count"] = merged["Burglary_Count"].fillna(0)
+
+    ward_totals = merged.groupby("Ward_code")["Burglary_Count"].sum().reset_index()
+    ward_totals = ward_totals.rename(columns={"Burglary_Count": "Ward_Total_Burglary"})
+
+    merged = merged.merge(ward_totals, on="Ward_code", how="left")
+
+    merged["LSOA_Pct_of_Ward"] = (
+                                         merged["Burglary_Count"] / merged["Ward_Total_Burglary"]
+                                 ).fillna(0) * 100
+
+    lsoa_pct_ward = merged[[
+        "Ward_code", "Ward", "LSOA11CD", "LSOA11NM",
+        "Burglary_Count", "Ward_Total_Burglary", "LSOA_Pct_of_Ward"
+    ]]
+
+    lsoa_pct_ward = lsoa_pct_ward.sort_values(
+        by=["Ward_code", "Burglary_Count"], ascending=[True, False]
+    ).reset_index(drop=True)
+    return lsoa_pct_ward
+def Generate_schedules():
+    lsoa_pct_ward = Combine_LSOAs_Wards_predictions("2025-02-01") #CHANGE THIS! this has to be the selected month (predicted)
+
+    # the 4 fucky LSOAs
+    new_rows_data = [
+        {
+            "LSOA11CD": "E01033725",
+            "LSOA11NM": "Hillingdon 015F",
+            "new_ward": "Uxbridge South",
+            "new_ward_code": "E05000341",
+            "reduction": 0.74291096
+        },
+        {
+            "LSOA11CD": "E01033701",
+            "LSOA11NM": "Hackney 002F",
+            "new_ward": "New River",
+            "new_ward_code": "E05000244",
+            "reduction": 0.66393763
+        },
+        {
+            "LSOA11CD": "E01032805",
+            "LSOA11NM": "Southwark 022F",
+            "new_ward": "Livesey",
+            "new_ward_code": "E05000543",
+            "reduction": 0.64279839
+        },
+        {
+            "LSOA11CD": "E01032720",
+            "LSOA11NM": "Southwark 009F",
+            "new_ward": "Chaucer",
+            "new_ward_code": "E05000537",
+            "reduction": 0.57400393
+        }
+    ]
+    new_rows = []
+    for item in new_rows_data:
+        # get original row based on LSOA11CD
+        original_row = lsoa_pct_ward[lsoa_pct_ward['LSOA11CD'] == item["LSOA11CD"]].iloc[0].copy()
+        print(lsoa_pct_ward[lsoa_pct_ward['LSOA11NM'].str.contains(item["LSOA11NM"], case=False, na=False)])
+        match = lsoa_pct_ward['LSOA11NM'].str.contains(item["LSOA11NM"], case=False, na=False)
+
+        # Apply the reduction to Burglary_Count
+        lsoa_pct_ward.loc[match, 'Burglary_Count'] = (lsoa_pct_ward.loc[match, 'Burglary_Count'] * item['reduction'])
+        # modify burglary count
+        original_row["Burglary_Count"] *= (1 - item["reduction"])
+
+        # assign new ward info
+        original_row["Ward"] = item["new_ward"]
+        original_row[("Ward_code")] = item["new_ward_code"]
+
+        # get Ward_Total_Burglary from any row in that new ward
+        ward_rows = lsoa_pct_ward[lsoa_pct_ward["Ward"] == item["new_ward"]]
+        if not ward_rows.empty:
+            original_row["Ward_Total_Burglary"] = ward_rows.iloc[0]["Ward_Total_Burglary"]
+        else:
+            original_row["Ward_Total_Burglary"] = np.nan  # or set manually
+
+        new_rows.append(original_row)
+
+    #
+    new_rows_df = pd.DataFrame(new_rows)
+    lsoa_pct_ward = pd.concat([lsoa_pct_ward, new_rows_df], ignore_index=True)
+
+    lsoa_pct_ward["LSOA_Pct_of_Ward"] = (lsoa_pct_ward["Burglary_Count"] / lsoa_pct_ward["Ward_Total_Burglary"])
+
+    num_officers = 100
+    num_days = 35  # 5 weeks bc months are annoying
+    max_shifts_per_week = 4
+    shift_hours = 2
+    patrol_hours = list(range(6, 21))  # 6:00-20:00
+
+    shift_start_options = [f"{hour:02d}:00" for hour in patrol_hours]
+    weights = np.array([1 + 2 * (hour >= 16) for hour in patrol_hours])
+    probabilities = weights / weights.sum()
+
+    # Output folder
+    output_dir = DATA_DIR
+    os.makedirs(output_dir, exist_ok=True)
+
+    full_schedule_df = pd.DataFrame()
+
+    # for  each ward
+    for ward_name in lsoa_pct_ward['Ward'].dropna().unique():
+        # Get LSOAs and their weights for the ward
+        ward_lsoas_df = lsoa_pct_ward[lsoa_pct_ward['Ward'] == ward_name].dropna(
+            subset=['LSOA11NM', 'LSOA_Pct_of_Ward'])
+
+        # Skip if no LSOAs found
+        if ward_lsoas_df.empty:
+            continue
+
+        ward_lsoas = ward_lsoas_df['LSOA11NM'].tolist()
+        ward_weights = ward_lsoas_df['LSOA_Pct_of_Ward'].tolist()
+
+        schedule = []
+
+        for officer_id in range(1, num_officers + 1):
+            patrol_row = []
+
+            for week in range(5):
+                start_day = week * 7 + 1
+                end_day = start_day + 6
+                days_in_week = list(range(start_day, end_day + 1))
+
+                days_on = sorted(random.sample(days_in_week, k=max_shifts_per_week))
+                weekly_lsoa_coverage = []
+
+                for day in days_in_week:
+                    if day in days_on:
+                        shift_start = np.random.choice(shift_start_options, p=probabilities)
+
+                        # Ensure each LSOA is visited weekly
+                        unvisited_lsoas = list(set(ward_lsoas) - set(weekly_lsoa_coverage))
+
+                        if unvisited_lsoas:
+                            assigned_lsoa = random.choice(unvisited_lsoas)
+                        else:
+                            assigned_lsoa = random.choices(ward_lsoas, weights=ward_weights, k=1)[0]
+
+                        weekly_lsoa_coverage.append(assigned_lsoa)
+                        patrol_row.append(f"{shift_start} | {assigned_lsoa}")
+                    else:
+                        patrol_row.append("")
+
+            schedule.append(patrol_row)
+
+        # Create DataFrame
+        columns = [f"Day {i}" for i in range(1, num_days + 1)]
+        schedule_df = pd.DataFrame(schedule, columns=columns)
+        schedule_df.insert(0, "Officer ID", [f"{ward_name}_Officer_{i}" for i in range(1, num_officers + 1)])
+
+        full_schedule_df = pd.concat([full_schedule_df, schedule_df], ignore_index=True)
+    output_path = os.path.join(output_dir, f"All_wards_patrol_schedule.csv")
+    full_schedule_df.to_csv(output_path, index=False)
+
+def get_ward_schedule(Ward_name): #This only works if Generate_schedules has run already
+    full_schedule_df = pd.read_csv(os.path.join(DATA_DIR, f"All_wards_patrol_schedule.csv"))
+    first_col = full_schedule_df.columns[0]
+    return full_schedule_df[full_schedule_df[first_col].str.startswith(f"{Ward_name}_Officer_")].copy()
 
 
 if __name__ == "__main__":
