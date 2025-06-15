@@ -6,26 +6,25 @@ import numpy as np
 import traceback
 
 import dash
-from dash import dcc, html
+from dash import dcc, html, dash_table
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
-import os, pandas as pd
+import pandas as pd
 import geopandas as gpd
 import plotly.express as px
 from shapely import Point
 from shapely.geometry import shape
 
-from dash import dash_table
-
 import joblib
 from scipy.stats import entropy
+import random
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 
 # Centralized data folder
-DATA_DIR = r"../data"
-MODEL_DIR = r"../models"
+DATA_DIR = r"C:\Users\mgshe\OneDrive - TU Eindhoven\Desktop\data challange\data"
+MODEL_DIR = r"C:\Users\mgshe\OneDrive - TU Eindhoven\Desktop\data challange\models"
 
 # The “master” CSV with all LSOA × month burglary counts and features
 MASTER_CSV_PATH  = os.path.join(DATA_DIR, "crime_fixed_data.csv")
@@ -37,6 +36,10 @@ LSOA_GEOJSON     = os.path.join(DATA_DIR, "LSOAs.geojson")
 # (Leave these for your predicted/allocation modes later)
 PRED_CSV_PATH    = os.path.join(DATA_DIR, "burglary_next_month_forecast.csv")
 ALLOC_CSV_PATH   = os.path.join(DATA_DIR, "abbey_ward_patrol_schedule.csv")
+
+ID_DATA_PATH     = os.path.join(DATA_DIR, "ID-2019-for-London.csv")
+STOP_SEARCH_PATH = os.path.join(DATA_DIR, "stopandsearch2019.csv")
+MID_LSOA_PATH    = os.path.join(DATA_DIR, "Mid-2021-LSOA-2021.csv")
 
 # model paths
 MODEL_PATH = os.path.join(MODEL_DIR, "xgb_burglary_model.pkl")
@@ -297,6 +300,7 @@ def toggle_mode_controls(mode):
     Input("upload-file", "contents"),
     State("upload-file", "filename"),
 )
+ 
 def handle_upload(contents, filename):    
     if contents is None:
         raise PreventUpdate
@@ -359,71 +363,70 @@ def toggle_sidebar(n, open_):
 def store_sidebar_state(style):
     return style.get("transform") != "translateX(-100%)"
 
-
 @app.callback(
     Output("selected-ward", "data"),
     Output("back-button", "style"),
-    Input("map-ward",        "clickData"),
-    Input("back-button",     "n_clicks"),
+    Input("map-ward", "clickData"),
+    Input("back-button", "n_clicks"),
     Input("ward-search-button", "n_clicks"),
     State("ward-search-input", "value"),
+    State("data-mode", "value"),
 )
-def handle_selection(map_click, back_click, search_click, search_value):
+def handle_selection(map_click, back_click, search_click, search_value, mode):
     ctx = dash.callback_context
     if not ctx.triggered:
         raise PreventUpdate
-    trig = ctx.triggered[0]["prop_id"].split(".")[0]
+    triggered = ctx.triggered[0]["prop_id"].split(".")[0]
 
-    # 1) user clicked on the map
-    if trig == "map-ward" and map_click:
+    if triggered == "map-ward" and map_click:
         code = map_click["points"][0]["location"]
-        return code, {"display": "block", "width": "100%"}
+        return {"code": code, "mode": mode}, {"display": "block", "width": "100%"}
 
-    # 2) user clicked the Back button
-    if trig == "back-button":
+    if triggered == "back-button":
         return None, {"display": "none"}
 
-    # 3) user clicked the Go button in the search box
-    if trig == "ward-search-button" and search_value:
-        q = search_value.strip()
-        # try code first
-        if q.upper() in ward_mapping:
-            out_code = q.upper()
+    if triggered == "ward-search-button" and search_value:
+        query = search_value.strip()
+        if query.upper() in ward_mapping:
+            code = query.upper()
         else:
-            # then name lookup (case‐insensitive)
-            out_code = name_to_code.get(q.lower())
-        if not out_code:
+            code = name_to_code.get(query.lower())
+        if not code:
             raise PreventUpdate
-        return out_code, {"display": "block", "width": "100%"}
+        return {"code": code, "mode": mode}, {"display": "block", "width": "100%"}
 
-    # anything else → do nothing
     raise PreventUpdate
+
 
 from helper import save_prediction
 
 @app.callback(
     Output("error-message", "children"),
+    Output("predict-button", "n_clicks"),  # reset the button
     Input("predict-button", "n_clicks"),
     State("predict-month", "value")
 )
 def predict_month(n_clicks, month_str):
     if n_clicks == 0:
         raise PreventUpdate
-    elif month_str is None:
-        return html.Label("Please enter a month in YYYY-MM format.")
-    
+
+    if not month_str:
+        return html.Label("Please enter a month in YYYY-MM format."), 0
+
     try:
-       month = pd.to_datetime(month_str, format="%Y-%m")
-       if month is not None and month < pd.Timestamp.now():
-           return html.Label("Error: Cannot predict for past months.")
-
+        month = pd.to_datetime(month_str, format="%Y-%m")
+        if month < pd.Timestamp.now():
+            return html.Label("Error: Cannot predict for past months."), 0
     except ValueError:
-        return html.Label("Error: Invalid date format. Use YYYY-MM.")
+        return html.Label("Error: Invalid date format. Use YYYY-MM."), 0
 
-    print("Predicting for month:", month_str)
-    # Call the save_prediction function with the appropriate arguments
-    save_prediction(model, scaler, month_str)
-    return html.Label(f"Prediction for {month_str} saved successfully.")
+    try:
+        print("Predicting for month:", month_str)
+        save_prediction(model, scaler, month_str)
+        return html.Label(f"Prediction for {month_str} saved successfully."), 0
+    except Exception as e:
+        print("Prediction error:", e)
+        return html.Label("Error running prediction. Check logs."), 0
 
 @app.callback(
     Output("map-ward", "figure"),
@@ -431,240 +434,29 @@ def predict_month(n_clicks, month_str):
     Output("map-ward", "style"),
     Output("map-lsoa", "style"),
     Output("allocation-table-container", "children"),
-    Input("apply-button",    "n_clicks"),
-    Input("selected-ward",   "data"),
-    State("level",           "value"),
-    State("data-mode",       "value"),
-    State("past-range",      "value"),
+    Input("apply-button", "n_clicks"),
+    Input("predict-button", "n_clicks"),
+    Input("data-mode", "value"),
+    Input("selected-ward", "data"),  # <-- new!
+    State("level", "value"),
+    State("past-range", "value"),
 )
-def update_maps(n_clicks, selected_ward, level, mode, past_range):
-    # ── 1) Load & filter master CSV ──────────────────────────────────────
-    df = pd.read_csv(MASTER_CSV_PATH, parse_dates=["month"])
-    y0, y1 = int(past_range[0]), int(past_range[1])
-    df = df[(df.month.dt.year >= y0) & (df.month.dt.year <= y1)]
-    # restrict to London LSOAs
-    df = df[df.lsoa_code.isin(lsoa_to_ward)]
-    if df.empty:
-        blank = px.choropleth_map(
-            pd.DataFrame({"code":[], "count":[]}),
-            geojson=ward_geo, featureidkey="properties.GSS_Code",
-            locations="code", color="count",
-            map_style="open-street-map",
-            center={"lat":51.5074,"lon":-0.1278}, zoom=10
-        )
-        blank.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-        return blank, blank, FULL_MAP_STYLE, {"display":"none"}, html.Div()
-    
-    if mode == "pred":
-        # Load your predictions CSV
-        df_pred = pd.read_csv(PRED_CSV_PATH)
-        # Expect columns: ['lsoa_code', 'predicted_count']
+def unified_map_callback(apply_clicks, predict_clicks, mode, selected_ward, level, past_range):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        raise PreventUpdate
 
-        if level == "ward":
-            # Map LSOA → ward then aggregate
-            df_pred["ward_code"] = df_pred.lsoa_code.map(lsoa_to_ward)
-            wc = (
-                df_pred.groupby("ward_code")["predicted_burglary"]
-                       .sum().reset_index(name="count")
-            )
-            # Ensure all wards displayed
-            all_w = [f["properties"]["GSS_Code"] for f in ward_geo["features"]]
-            dfw = pd.DataFrame({"code": all_w}).merge(
-                wc.rename(columns={"ward_code":"code", "predicted_burglary":"count"}), on="code", how="left"
-            )
-            dfw["count"] = dfw["count"].fillna(0).astype(int)
+    trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
-            # Choropleth of predicted counts by ward
-            fig = px.choropleth_map(
-                dfw, geojson=ward_geo, featureidkey="properties.GSS_Code",
-                locations="code", color="count",
-                color_continuous_scale="oryel", opacity=0.7,
-                map_style="open-street-map",
-                center={"lat":51.5074, "lon":-0.1278}, zoom=10,
-                labels={"count":"Predicted Burglaries"},
-            )
-            fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-            # Hide LSOA & table in ward overview
-            return fig, fig, FULL_MAP_STYLE, {"display":"none"}, html.Div()
+    if mode == "past" and trigger_id in ["apply-button", "data-mode", "selected-ward"]:
+        return generate_map("past", selected_ward, level, past_range)
 
-        # LSOA view (full London)
-        df_ls = df_pred.rename(columns={"lsoa_code":"code", "predicted_burglary":"count"})
-        fig = px.choropleth_map(
-            df_ls, geojson=lsoa_geo, featureidkey="properties.LSOA11CD",
-            locations="code", color="count",
-            color_continuous_scale="oryel", opacity=0.7,
-            map_style="open-street-map",
-            center={"lat":51.5074, "lon":-0.1278}, zoom=10,
-            labels={"count":"Predicted Burglaries"},
-        )
-        fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-        
-        # ── no ward drilled down → full-width ward map, hide LSOA & alloc
-        if not selected_ward:
-            return ward_fig, ward_fig, FULL_MAP_STYLE, {"display":"none"}, html.Div()
+    if mode == "pred" and trigger_id in ["data-mode", "predict-button", "selected-ward"]:
+        return generate_map("pred", selected_ward, level)
 
-        # ── 2a) Ward drilled down → LSOA map + allocation table ─────────
-        # get that ward geometry
-        ward_geom = next(
-            f["geometry"] for f in ward_geo["features"]
-            if f["properties"]["GSS_Code"] == selected_ward
-        )
-        # pick only those LSOAs whose centroid falls inside
-        feats = [
-            f for f in lsoa_geo["features"]
-            if shape(ward_geom).contains(shape(f["geometry"]).centroid)
-        ]
-        geo_l = {"type":"FeatureCollection","features":feats}
-        lcodes = [f["properties"]["LSOA11CD"] for f in feats]
-        fl = (
-            df_pred[df_pred.lsoa_code.isin(lcodes)]
-            .groupby("lsoa_code")["burglary_count"]
-            .sum().reset_index(name="count")
-        ).rename(columns={"lsoa_code":"code"})
+    raise PreventUpdate
 
-        # centre on ward
-        minx, miny, maxx, maxy = shape(ward_geom).bounds
-        center_l = {"lat":(miny+maxy)/2, "lon":(minx+maxx)/2}
 
-        lsoa_fig = px.choropleth_map(
-            fl, geojson=geo_l, featureidkey="properties.LSOA11CD",
-            locations="code", color="count", opacity=0.7,
-            color_continuous_scale="oryel",
-            map_style="open-street-map",
-            center=center_l, zoom=12,
-            labels={"count":"Burglary Count"},
-        )
-        lsoa_fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-
-        # load the allocation CSV for this ward
-        alloc_path = os.path.join(DATA_DIR, "allocations", f"{selected_ward}.csv")
-        if os.path.exists(alloc_path):
-            df_alloc = pd.read_csv(alloc_path)
-            alloc_table = dash_table.DataTable(
-                data=df_alloc.to_dict("records"),
-                columns=[{"name":c,"id":c} for c in df_alloc.columns],
-                style_table={"overflowX":"auto"},
-                style_cell={"padding":"4px","textAlign":"left"}
-            )
-        else:
-            alloc_table = html.Div(f"No allocation file for {selected_ward}", style={"color":"red"})
-
-        return (
-            ward_fig,      # left top
-            lsoa_fig,      # right top
-            HALF_MAP_STYLE,# left graph style
-            HALF_MAP_STYLE,# right graph style
-            alloc_table    # bottom
-        )
-
-    if mode == "past":
-        # ── 2) Ward‐level view ────────────────────────────────────────────────
-        if level == "ward":
-            # aggregate monthly counts up to wards
-            df["ward_code"] = df.lsoa_code.map(lsoa_to_ward)
-            wc = (
-                df.groupby("ward_code")["burglary_count"]
-                .sum().reset_index(name="count")
-            )
-            # ensure every ward shows up
-            all_w = [f["properties"]["GSS_Code"] for f in ward_geo["features"]]
-            dfw = pd.DataFrame({"code": all_w}).merge(
-                wc.rename(columns={"ward_code":"code"}), on="code", how="left"
-            )
-            dfw["count"] = dfw["count"].fillna(0).astype(int)
-
-            ward_fig = px.choropleth_map(
-                dfw, geojson=ward_geo, featureidkey="properties.GSS_Code",
-                locations="code", color="count", opacity=0.7,
-                color_continuous_scale="oryel",
-                map_style="open-street-map",
-                center={"lat":51.5074,"lon":-0.1278}, zoom=10,
-                labels={"count":"Burglary Count"},
-            )
-            ward_fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-
-            # ── no ward drilled down → full-width ward map, hide LSOA & alloc
-            if not selected_ward:
-                return ward_fig, ward_fig, FULL_MAP_STYLE, {"display":"none"}, html.Div()
-
-            # ── 2a) Ward drilled down → LSOA map + allocation table ─────────
-            # get that ward geometry
-            ward_geom = next(
-                f["geometry"] for f in ward_geo["features"]
-                if f["properties"]["GSS_Code"] == selected_ward
-            )
-            # pick only those LSOAs whose centroid falls inside
-            feats = [
-                f for f in lsoa_geo["features"]
-                if shape(ward_geom).contains(shape(f["geometry"]).centroid)
-            ]
-            geo_l = {"type":"FeatureCollection","features":feats}
-            lcodes = [f["properties"]["LSOA11CD"] for f in feats]
-            fl = (
-                df[df.lsoa_code.isin(lcodes)]
-                .groupby("lsoa_code")["burglary_count"]
-                .sum().reset_index(name="count")
-            ).rename(columns={"lsoa_code":"code"})
-
-            # centre on ward
-            minx, miny, maxx, maxy = shape(ward_geom).bounds
-            center_l = {"lat":(miny+maxy)/2, "lon":(minx+maxx)/2}
-
-            lsoa_fig = px.choropleth_map(
-                fl, geojson=geo_l, featureidkey="properties.LSOA11CD",
-                locations="code", color="count", opacity=0.7,
-                color_continuous_scale="oryel",
-                map_style="open-street-map",
-                center=center_l, zoom=12,
-                labels={"count":"Burglary Count"},
-            )
-            lsoa_fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-
-            # load the allocation CSV for this ward
-            alloc_path = os.path.join(DATA_DIR, "allocations", f"{selected_ward}.csv")
-            if os.path.exists(alloc_path):
-                df_alloc = pd.read_csv(alloc_path)
-                alloc_table = dash_table.DataTable(
-                    data=df_alloc.to_dict("records"),
-                    columns=[{"name":c,"id":c} for c in df_alloc.columns],
-                    style_table={"overflowX":"auto"},
-                    style_cell={"padding":"4px","textAlign":"left"}
-                )
-            else:
-                alloc_table = html.Div(f"No allocation file for {selected_ward}", style={"color":"red"})
-
-            return (
-                ward_fig,      # left top
-                lsoa_fig,      # right top
-                HALF_MAP_STYLE,# left graph style
-                HALF_MAP_STYLE,# right graph style
-                alloc_table    # bottom
-            )
-
-    # ── 3) Full-London LSOA view ─────────────────────────────────────────
-    df_ls = (
-        df.groupby("lsoa_code")["burglary_count"]
-          .sum().reset_index(name="count")
-          .rename(columns={"lsoa_code":"code"})
-    )
-    lsoaf = px.choropleth_map(
-        df_ls, geojson=lsoa_geo, featureidkey="properties.LSOA11CD",
-        locations="code", color="count", opacity=0.7,
-        color_continuous_scale="oryel",
-        map_style="open-street-map",
-        center={"lat":51.5074,"lon":-0.1278}, zoom=10,
-        labels={"count":"Burglary Count"},
-    )
-    lsoaf.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-
-    # hide ward map & allocation if you’re in LSOA‐only view
-    return (
-        lsoaf,                # map-ward (hidden)
-        lsoaf,                # map-lsoa
-        {"display":"none"},   # ward style
-        FULL_MAP_STYLE,       # lsoa style
-        html.Div()            # empty alloc container
-    )
 
 def update_model_with_new_data(new_df: pd.DataFrame):
     exclude_cols = {
@@ -698,14 +490,14 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     print("Filtered to London LSOAs:", df["lsoa_code"].nunique(), "unique LSOAs remaining")
 
     # Load and clean stop and search data
-    stop_and_search_data = pd.read_csv("../data/stopandsearch2019.csv", skiprows=2, on_bad_lines='skip', engine="python")
+    stop_and_search_data = pd.read_csv(STOP_SEARCH_PATH, skiprows=2, on_bad_lines='skip', engine="python")
     stop_and_search_data.columns = stop_and_search_data.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
     stop_and_search_data["date"] = pd.to_datetime(stop_and_search_data["date"], errors="coerce")
     stop_and_search_data.dropna(subset=["date", "longitude", "latitude"], inplace=True)
     stop_and_search_data["month"] = stop_and_search_data["date"].dt.to_period("M").dt.to_timestamp()
 
     # Attach LSOA to stop and search
-    lsoa_gdf = gpd.read_file("../data/LSOAs.geojson")
+    lsoa_gdf = gpd.read_file(LSOA_GEOJSON)
     stop_and_search_data["geometry"] = stop_and_search_data.apply(lambda row: Point(row["longitude"], row["latitude"]), axis=1)
     stop_gdf = gpd.GeoDataFrame(stop_and_search_data, geometry="geometry", crs="EPSG:4326").to_crs(lsoa_gdf.crs)
     stop_with_lsoa = gpd.sjoin(stop_gdf, lsoa_gdf[["LSOA11CD", "geometry"]], how="left", predicate="within")
@@ -769,7 +561,7 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     full_df["is_holiday_season"] = full_df["month_num"].isin([11, 12]).astype(int)
 
     # Merge IMD and population
-    imd = pd.read_csv("../data/ID-2019-for-London.csv", delimiter=";")
+    imd = pd.read_csv(ID_DATA_PATH, delimiter=";")
     imd.columns = imd.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
     print("IMD columns:", imd.columns.tolist())
     imd = imd.rename(columns={
@@ -782,7 +574,7 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     })
     full_df = full_df.merge(imd, on="lsoa_code", how="left")
 
-    pop = pd.read_csv("../data/Mid-2021-LSOA-2021.csv", delimiter=";")
+    pop = pd.read_csv(MID_LSOA_PATH, delimiter=";")
     pop.columns = pop.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
     pop = pop.rename(columns={"lsoa_2021_code": "lsoa_code", "total": "population"})
     full_df = full_df.merge(pop[["lsoa_code", "population"]], on="lsoa_code", how="left")
@@ -888,6 +680,486 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     full_df["imd2019_x_msb"] = full_df["imd_decile_2019"].astype(float) * full_df["months_since_burglary"]
 
     return full_df
+
+def generate_map(mode, selected_ward, level, past_range=None):
+    df = pd.read_csv(MASTER_CSV_PATH, parse_dates=["month"])
+
+    # resolve selected ward object
+    if isinstance(selected_ward, dict):
+        selected_code = selected_ward.get("code")
+        selected_mode = selected_ward.get("mode")
+        if selected_mode != mode:
+            selected_code = None
+    else:
+        selected_code = selected_ward
+
+    if mode == "past":
+        y0, y1 = int(past_range[0]), int(past_range[1])
+        df = df[(df.month.dt.year >= y0) & (df.month.dt.year <= y1)]
+
+    df = df[df.lsoa_code.isin(lsoa_to_ward)]
+    if df.empty:
+        blank = px.choropleth_map(
+            pd.DataFrame({"code":[], "count":[]}),
+            geojson=ward_geo, featureidkey="properties.GSS_Code",
+            locations="code", color="count",
+            map_style="open-street-map",
+            center={"lat":51.5074,"lon":-0.1278}, zoom=10
+        )
+        blank.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+        return blank, blank, FULL_MAP_STYLE, {"display":"none"}, html.Div()
+
+    if mode == "pred":
+        df_pred = pd.read_csv(PRED_CSV_PATH)
+
+        if level == "ward":
+            df_pred["ward_code"] = df_pred.lsoa_code.map(lsoa_to_ward)
+            wc = (
+                df_pred.groupby("ward_code")["predicted_burglary"]
+                .sum().reset_index(name="count")
+            )
+            all_w = [f["properties"]["GSS_Code"] for f in ward_geo["features"]]
+            dfw = pd.DataFrame({"code": all_w}).merge(
+                wc.rename(columns={"ward_code":"code"}), on="code", how="left"
+            )
+            dfw["count"] = dfw["count"].fillna(0).astype(int)
+
+            ward_fig = px.choropleth_map(
+                dfw, geojson=ward_geo, featureidkey="properties.GSS_Code",
+                locations="code", color="count",
+                color_continuous_scale="oryel", opacity=0.7,
+                map_style="open-street-map",
+                center={"lat":51.5074, "lon":-0.1278}, zoom=10,
+                labels={"count":"Predicted Burglaries"},
+            )
+            ward_fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+
+            if not selected_code:
+                return ward_fig, ward_fig, FULL_MAP_STYLE, {"display":"none"}, html.Div()
+
+        # if selected
+        ward_geom = next(
+            f["geometry"] for f in ward_geo["features"]
+            if f["properties"]["GSS_Code"] == selected_code
+        )
+        feats = [
+            f for f in lsoa_geo["features"]
+            if shape(ward_geom).contains(shape(f["geometry"]).centroid)
+        ]
+        geo_l = {"type":"FeatureCollection","features":feats}
+        lcodes = [f["properties"]["LSOA11CD"] for f in feats]
+        fl = (
+            df_pred[df_pred.lsoa_code.isin(lcodes)]
+            .groupby("lsoa_code")["predicted_burglary"]
+            .sum().reset_index(name="count")
+        ).rename(columns={"lsoa_code":"code"})
+
+        minx, miny, maxx, maxy = shape(ward_geom).bounds
+        center_l = {"lat":(miny+maxy)/2, "lon":(minx+maxx)/2}
+
+        lsoa_fig = px.choropleth_map(
+            fl, geojson=geo_l, featureidkey="properties.LSOA11CD",
+            locations="code", color="count", opacity=0.7,
+            color_continuous_scale="oryel",
+            map_style="open-street-map",
+            center=center_l, zoom=12,
+            labels={"count":"Burglary Count"},
+        )
+        lsoa_fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+
+        alloc_path = os.path.join(DATA_DIR, "allocations", f"{selected_code}.csv")
+        if os.path.exists(alloc_path):
+            df_alloc = pd.read_csv(alloc_path)
+            alloc_table = dash_table.DataTable(
+                data=df_alloc.to_dict("records"),
+                columns=[{"name":c,"id":c} for c in df_alloc.columns],
+                style_table={"overflowX":"auto"},
+                style_cell={"padding":"4px","textAlign":"left"}
+            )
+        else:
+            alloc_table = html.Div(f"No allocation file for {selected_code}", style={"color":"red"})
+
+        return (
+            ward_fig,
+            lsoa_fig,
+            HALF_MAP_STYLE,
+            HALF_MAP_STYLE,
+            alloc_table
+        )
+
+    # ─────────────────────── Past mode
+    if level == "ward":
+        df["ward_code"] = df.lsoa_code.map(lsoa_to_ward)
+        wc = (
+            df.groupby("ward_code")["burglary_count"]
+            .sum().reset_index(name="count")
+        )
+        all_w = [f["properties"]["GSS_Code"] for f in ward_geo["features"]]
+        dfw = pd.DataFrame({"code": all_w}).merge(
+            wc.rename(columns={"ward_code":"code"}), on="code", how="left"
+        )
+        dfw["count"] = dfw["count"].fillna(0).astype(int)
+
+        ward_fig = px.choropleth_map(
+            dfw, geojson=ward_geo, featureidkey="properties.GSS_Code",
+            locations="code", color="count", opacity=0.7,
+            color_continuous_scale="oryel",
+            map_style="open-street-map",
+            center={"lat":51.5074,"lon":-0.1278}, zoom=10,
+            labels={"count":"Burglary Count"},
+        )
+        ward_fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+
+        if not selected_code:
+            return (
+                ward_fig,
+                ward_fig,
+                FULL_MAP_STYLE,
+                {"display":"none"},
+                html.Div()
+            )
+
+        ward_geom = next(
+            f["geometry"] for f in ward_geo["features"]
+            if f["properties"]["GSS_Code"] == selected_code
+        )
+        feats = [
+            f for f in lsoa_geo["features"]
+            if shape(ward_geom).contains(shape(f["geometry"]).centroid)
+        ]
+        geo_l = {"type":"FeatureCollection","features":feats}
+        lcodes = [f["properties"]["LSOA11CD"] for f in feats]
+        fl = (
+            df[df.lsoa_code.isin(lcodes)]
+            .groupby("lsoa_code")["burglary_count"]
+            .sum().reset_index(name="count")
+        ).rename(columns={"lsoa_code":"code"})
+
+        minx, miny, maxx, maxy = shape(ward_geom).bounds
+        center_l = {"lat":(miny+maxy)/2, "lon":(minx+maxx)/2}
+
+        lsoa_fig = px.choropleth_map(
+            fl, geojson=geo_l, featureidkey="properties.LSOA11CD",
+            locations="code", color="count", opacity=0.7,
+            color_continuous_scale="oryel",
+            map_style="open-street-map",
+            center=center_l, zoom=12,
+            labels={"count":"Burglary Count"},
+        )
+        lsoa_fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+
+        return (
+            ward_fig,
+            lsoa_fig,
+            HALF_MAP_STYLE,
+            HALF_MAP_STYLE,
+            html.Div()
+        )
+
+    # ─────────────── Full LSOA view
+    df_ls = (
+        df.groupby("lsoa_code")["burglary_count"]
+          .sum().reset_index(name="count")
+          .rename(columns={"lsoa_code":"code"})
+    )
+    lsoaf = px.choropleth_map(
+        df_ls, geojson=lsoa_geo, featureidkey="properties.LSOA11CD",
+        locations="code", color="count", opacity=0.7,
+        color_continuous_scale="oryel",
+        map_style="open-street-map",
+        center={"lat":51.5074,"lon":-0.1278}, zoom=10,
+        labels={"count":"Burglary Count"},
+    )
+    lsoaf.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+
+    return (
+        lsoaf,                # map-ward (hidden)
+        lsoaf,                # map-lsoa
+        {"display":"none"},   # ward style
+        FULL_MAP_STYLE,       # lsoa style
+        html.Div()            # empty alloc container
+    )
+def Combine_LSOAs_Wards_predictions(selected_month): #Selected month is for what month of the predicted data we wanna try to schedule
+    lsoas = WARD_GEOJSON
+    wards = LSOA_GEOJSON
+    lsoas["LSOA_area"] = lsoas.geometry.area
+    joined = gpd.sjoin(lsoas, wards, how='inner', predicate='intersects')
+    overlap_counts = joined.groupby(joined.index).size()
+    lsoas_with_multiple_wards = overlap_counts[overlap_counts > 1]
+    overlap_lsoas_names = lsoas.loc[lsoas_with_multiple_wards.index, "LSOA11NM"].tolist()
+
+    lsoas_multi = lsoas.loc[lsoas_with_multiple_wards.index]
+    joined_multi = joined.loc[lsoas_with_multiple_wards.index]
+
+    joined_multi = joined_multi.merge(
+        wards[["geometry", "Name", "GSS_Code"]], left_on="index_right", right_index=True, suffixes=('', '_ward')
+    )
+
+    joined_multi["intersection_geom"] = joined_multi.apply(
+        lambda row: row.geometry.intersection(row.geometry_ward), axis=1
+    )
+
+    # Calculate intersection area
+    joined_multi["intersect_area"] = joined_multi["intersection_geom"].area
+
+    # Calculate percentage
+    joined_multi["pct_of_lsoa_area"] = joined_multi["intersect_area"] / joined_multi["LSOA_area"] * 100
+
+    result = joined_multi[[
+        "LSOA11CD", "LSOA11NM", "GSS_Code", "Name", "intersect_area", "LSOA_area", "pct_of_lsoa_area"
+    ]].rename(columns={"Name": "Ward", "GSS_Code": "Ward_code"})
+
+    result.sort_values(by="LSOA11CD")
+
+    ward_counts = result.groupby('LSOA11CD')['Ward'].nunique()
+
+    # Sort
+    df_sorted = result.sort_values(['LSOA11CD', 'pct_of_lsoa_area'], ascending=[True, False])
+
+    df_max = df_sorted.drop_duplicates(subset='LSOA11CD', keep='first').copy()
+    df_max['ward_count'] = df_max['LSOA11CD'].map(ward_counts)
+
+    df_max_sorted = df_max.sort_values(by='pct_of_lsoa_area', ascending=False)
+
+    single_ward_lsoa_ids = overlap_counts[overlap_counts == 1].index
+    single_ward_rows = joined.loc[single_ward_lsoa_ids]
+
+    single_ward_df = single_ward_rows[['LSOA11CD', 'LSOA11NM', 'GSS_Code', 'Name']].rename(
+        columns={'Name': 'Ward', 'GSS_Code': 'Ward_code'})
+    multi_ward_df = df_max[['LSOA11CD', 'LSOA11NM', 'Ward_code', 'Ward']]
+
+    # Combine
+    final_lsoa_ward_df = pd.concat([single_ward_df, multi_ward_df], ignore_index=True)
+
+    # Sort by Ward_code
+    final_lsoa_ward_df = final_lsoa_ward_df.sort_values('Ward_code').reset_index(drop=True)
+
+    # Get burglary per month per LSOA
+
+                            # use the output of the predictive model (or ig the historical data)
+    crimes = PRED_CSV_PATH
+
+    crimes['Month'] = pd.to_datetime(crimes['Month'])
+
+    crimes_cleaned = crimes.dropna(subset=['Longitude', 'Latitude'])
+
+    burglary = crimes_cleaned[crimes_cleaned['Crime type'] == 'Burglary'].copy()
+
+    gdf_crimes = gpd.GeoDataFrame(
+        crimes_cleaned,
+        geometry=gpd.points_from_xy(crimes_cleaned['Longitude'], crimes_cleaned['Latitude']),
+        crs="EPSG:4326"
+    )
+
+    gdf_crimes = gpd.sjoin(
+        gdf_crimes,
+        lsoas[['geometry', 'LSOA11NM']],
+        how='left',
+        predicate='within'
+    )
+
+    gdf_burglary = gpd.GeoDataFrame(
+        burglary,
+        geometry=gpd.points_from_xy(burglary['Longitude'], burglary['Latitude']),
+        crs="EPSG:4326"
+    )
+
+    gdf_burglary = gpd.sjoin(
+        gdf_burglary,
+        lsoas[['geometry', 'LSOA11NM']],
+        how='left',
+        predicate='within'
+    )
+
+    monthly_burglary_counts = (
+        gdf_burglary.dropna(subset=['LSOA11NM'])
+        .groupby(['LSOA11NM', gdf_burglary['Month'].dt.to_period('M')])
+        .size()
+        .reset_index(name='Burglary_Count')
+    )
+
+    monthly_burglary_counts['Month'] = monthly_burglary_counts['Month'].dt.to_timestamp()
+
+    burglary_pivot = monthly_burglary_counts.pivot(index='LSOA11NM', columns='Month', values='Burglary_Count').fillna(0)
+
+    full_lsoa_months = pd.MultiIndex.from_product(
+        [monthly_burglary_counts['LSOA11NM'].unique(), monthly_burglary_counts['Month'].unique()],
+        names=['LSOA11NM', 'Month']
+    )
+
+    monthly_burglary_counts = monthly_burglary_counts.set_index(['LSOA11NM', 'Month']).reindex(full_lsoa_months,
+                                                                                               fill_value=0).reset_index()
+
+    burglary_for_month = monthly_burglary_counts[
+        monthly_burglary_counts["Month"] == selected_month
+        ]
+
+    merged = final_lsoa_ward_df.merge(
+        burglary_for_month,
+        on="LSOA11NM",
+        how="left"
+    )
+
+    merged["Burglary_Count"] = merged["Burglary_Count"].fillna(0)
+
+    ward_totals = merged.groupby("Ward_code")["Burglary_Count"].sum().reset_index()
+    ward_totals = ward_totals.rename(columns={"Burglary_Count": "Ward_Total_Burglary"})
+
+    merged = merged.merge(ward_totals, on="Ward_code", how="left")
+
+    merged["LSOA_Pct_of_Ward"] = (
+                                         merged["Burglary_Count"] / merged["Ward_Total_Burglary"]
+                                 ).fillna(0) * 100
+
+    lsoa_pct_ward = merged[[
+        "Ward_code", "Ward", "LSOA11CD", "LSOA11NM",
+        "Burglary_Count", "Ward_Total_Burglary", "LSOA_Pct_of_Ward"
+    ]]
+
+    lsoa_pct_ward = lsoa_pct_ward.sort_values(
+        by=["Ward_code", "Burglary_Count"], ascending=[True, False]
+    ).reset_index(drop=True)
+    return lsoa_pct_ward
+def Generate_schedules():
+    lsoa_pct_ward = Combine_LSOAs_Wards_predictions("2025-02-01") #CHANGE THIS! this has to be the selected month (predicted)
+
+    # the 4 fucky LSOAs
+    new_rows_data = [
+        {
+            "LSOA11CD": "E01033725",
+            "LSOA11NM": "Hillingdon 015F",
+            "new_ward": "Uxbridge South",
+            "new_ward_code": "E05000341",
+            "reduction": 0.74291096
+        },
+        {
+            "LSOA11CD": "E01033701",
+            "LSOA11NM": "Hackney 002F",
+            "new_ward": "New River",
+            "new_ward_code": "E05000244",
+            "reduction": 0.66393763
+        },
+        {
+            "LSOA11CD": "E01032805",
+            "LSOA11NM": "Southwark 022F",
+            "new_ward": "Livesey",
+            "new_ward_code": "E05000543",
+            "reduction": 0.64279839
+        },
+        {
+            "LSOA11CD": "E01032720",
+            "LSOA11NM": "Southwark 009F",
+            "new_ward": "Chaucer",
+            "new_ward_code": "E05000537",
+            "reduction": 0.57400393
+        }
+    ]
+    new_rows = []
+    for item in new_rows_data:
+        # get original row based on LSOA11CD
+        original_row = lsoa_pct_ward[lsoa_pct_ward['LSOA11CD'] == item["LSOA11CD"]].iloc[0].copy()
+        print(lsoa_pct_ward[lsoa_pct_ward['LSOA11NM'].str.contains(item["LSOA11NM"], case=False, na=False)])
+        match = lsoa_pct_ward['LSOA11NM'].str.contains(item["LSOA11NM"], case=False, na=False)
+
+        # Apply the reduction to Burglary_Count
+        lsoa_pct_ward.loc[match, 'Burglary_Count'] = (lsoa_pct_ward.loc[match, 'Burglary_Count'] * item['reduction'])
+        # modify burglary count
+        original_row["Burglary_Count"] *= (1 - item["reduction"])
+
+        # assign new ward info
+        original_row["Ward"] = item["new_ward"]
+        original_row[("Ward_code")] = item["new_ward_code"]
+
+        # get Ward_Total_Burglary from any row in that new ward
+        ward_rows = lsoa_pct_ward[lsoa_pct_ward["Ward"] == item["new_ward"]]
+        if not ward_rows.empty:
+            original_row["Ward_Total_Burglary"] = ward_rows.iloc[0]["Ward_Total_Burglary"]
+        else:
+            original_row["Ward_Total_Burglary"] = np.nan  # or set manually
+
+        new_rows.append(original_row)
+
+    #
+    new_rows_df = pd.DataFrame(new_rows)
+    lsoa_pct_ward = pd.concat([lsoa_pct_ward, new_rows_df], ignore_index=True)
+
+    lsoa_pct_ward["LSOA_Pct_of_Ward"] = (lsoa_pct_ward["Burglary_Count"] / lsoa_pct_ward["Ward_Total_Burglary"])
+
+    num_officers = 100
+    num_days = 35  # 5 weeks bc months are annoying
+    max_shifts_per_week = 4
+    shift_hours = 2
+    patrol_hours = list(range(6, 21))  # 6:00-20:00
+
+    shift_start_options = [f"{hour:02d}:00" for hour in patrol_hours]
+    weights = np.array([1 + 2 * (hour >= 16) for hour in patrol_hours])
+    probabilities = weights / weights.sum()
+
+    # Output folder
+    output_dir = DATA_DIR
+    os.makedirs(output_dir, exist_ok=True)
+
+    full_schedule_df = pd.DataFrame()
+
+    # for  each ward
+    for ward_name in lsoa_pct_ward['Ward'].dropna().unique():
+        # Get LSOAs and their weights for the ward
+        ward_lsoas_df = lsoa_pct_ward[lsoa_pct_ward['Ward'] == ward_name].dropna(
+            subset=['LSOA11NM', 'LSOA_Pct_of_Ward'])
+
+        # Skip if no LSOAs found
+        if ward_lsoas_df.empty:
+            continue
+
+        ward_lsoas = ward_lsoas_df['LSOA11NM'].tolist()
+        ward_weights = ward_lsoas_df['LSOA_Pct_of_Ward'].tolist()
+
+        schedule = []
+
+        for officer_id in range(1, num_officers + 1):
+            patrol_row = []
+
+            for week in range(5):
+                start_day = week * 7 + 1
+                end_day = start_day + 6
+                days_in_week = list(range(start_day, end_day + 1))
+
+                days_on = sorted(random.sample(days_in_week, k=max_shifts_per_week))
+                weekly_lsoa_coverage = []
+
+                for day in days_in_week:
+                    if day in days_on:
+                        shift_start = np.random.choice(shift_start_options, p=probabilities)
+
+                        # Ensure each LSOA is visited weekly
+                        unvisited_lsoas = list(set(ward_lsoas) - set(weekly_lsoa_coverage))
+
+                        if unvisited_lsoas:
+                            assigned_lsoa = random.choice(unvisited_lsoas)
+                        else:
+                            assigned_lsoa = random.choices(ward_lsoas, weights=ward_weights, k=1)[0]
+
+                        weekly_lsoa_coverage.append(assigned_lsoa)
+                        patrol_row.append(f"{shift_start} | {assigned_lsoa}")
+                    else:
+                        patrol_row.append("")
+
+            schedule.append(patrol_row)
+
+        # Create DataFrame
+        columns = [f"Day {i}" for i in range(1, num_days + 1)]
+        schedule_df = pd.DataFrame(schedule, columns=columns)
+        schedule_df.insert(0, "Officer ID", [f"{ward_name}_Officer_{i}" for i in range(1, num_officers + 1)])
+
+        full_schedule_df = pd.concat([full_schedule_df, schedule_df], ignore_index=True)
+    output_path = os.path.join(output_dir, f"All_wards_patrol_schedule.csv")
+    full_schedule_df.to_csv(output_path, index=False)
+
+def get_ward_schedule(Ward_name): #This only works if Generate_schedules has run already
+    full_schedule_df = pd.read_csv(os.path.join(DATA_DIR, f"All_wards_patrol_schedule.csv"))
+    first_col = full_schedule_df.columns[0]
+    return full_schedule_df[full_schedule_df[first_col].str.startswith(f"{Ward_name}_Officer_")].copy()
+
 
 if __name__ == "__main__":
     app.run(debug=True)

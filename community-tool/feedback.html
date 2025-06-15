@@ -3,6 +3,7 @@
 <html lang="en">
 
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta charset="UTF-8">
     <title>Community Safety Feedback</title>
     <link rel="stylesheet" href="style.css">
@@ -20,9 +21,11 @@
     <div id="feedback-container" class="container">
         <h1>Safety Feedback</h1>
         <h5 id="disclaimer">
-            Any answers and content discussed is encrypted and anonymized on submission and will be kept that way
+            Answers to this form are secure and will only be used by the police force in an anonimized manner.
         </h5>
-
+        <div id="form-warning" style="display: none; color: red; margin-bottom: 1em;">
+            You have unanswered mandatory questions.
+        </div>
         <form id="survey-form">
             <!-- Question 1: Safety rating -->
             <div class="form-control" id="first-question">
@@ -61,16 +64,148 @@
                     <label for="resp5">5</label>
                 </div>
             </div>
+            <!-- Question 5: Fear of burglary -->
+            <div class="form-control">
+                <label>3. How worried are you about someone breaking into your home in the next 12 months?
+                    <small>(1 = Very Worried, 5 = Not Worried at All)</small>
+                </label>
+                <div class="rating-options">
+                    <input type="radio" id="fear1" name="burglary_worry" value="1" required>
+                    <label for="fear1">1</label>
+                    <input type="radio" id="fear2" name="burglary_worry" value="2">
+                    <label for="fear2">2</label>
+                    <input type="radio" id="fear3" name="burglary_worry" value="3">
+                    <label for="fear3">3</label>
+                    <input type="radio" id="fear4" name="burglary_worry" value="4">
+                    <label for="fear4">4</label>
+                    <input type="radio" id="fear5" name="burglary_worry" value="5">
+                    <label for="fear5">5</label>
+                </div>
+            </div>
 
+            <!-- Question 6: Change in burglary risk -->
+            <div class="form-control">
+                <label>4. Compared with a year ago, do you think the chance of a burglary on your street is now...?
+                    <small>(1 = Much Higher, 5 = Much Lower)</small>
+                </label>
+                <div class="rating-options">
+                    <input type="radio" id="risk1" name="burglary_risk_change" value="1" required>
+                    <label for="risk1">1</label>
+                    <input type="radio" id="risk2" name="burglary_risk_change" value="2">
+                    <label for="risk2">2</label>
+                    <input type="radio" id="risk3" name="burglary_risk_change" value="3">
+                    <label for="risk3">3</label>
+                    <input type="radio" id="risk4" name="burglary_risk_change" value="4">
+                    <label for="risk4">4</label>
+                    <input type="radio" id="risk5" name="burglary_risk_change" value="5">
+                    <label for="risk5">5</label>
+                </div>
+            </div>
+
+            <!-- Question 7: Confidence when leaving home -->
+            <div class="form-control">
+                <label>5. When you leave home for more than an hour, how confident are you your belongings are safe?
+                    <small>(1 = Not at All Confident, 5 = Very Confident)</small>
+                </label>
+                <div class="rating-options">
+                    <input type="radio" id="leave1" name="confidence_leaving_home" value="1" required>
+                    <label for="leave1">1</label>
+                    <input type="radio" id="leave2" name="confidence_leaving_home" value="2">
+                    <label for="leave2">2</label>
+                    <input type="radio" id="leave3" name="confidence_leaving_home" value="3">
+                    <label for="leave3">3</label>
+                    <input type="radio" id="leave4" name="confidence_leaving_home" value="4">
+                    <label for="leave4">4</label>
+                    <input type="radio" id="leave5" name="confidence_leaving_home" value="5">
+                    <label for="leave5">5</label>
+                </div>
+            </div>
+
+            <!-- Question 8: Police patrol visibility -->
+            <div class="form-control">
+                <label>6. How often do you see a uniformed police patrol on your street after dark?
+                    <small>(1 = Never, 5 = Very Often)</small>
+                </label>
+                <div class="rating-options">
+                    <input type="radio" id="patrol1" name="police_visibility" value="1" required>
+                    <label for="patrol1">1</label>
+                    <input type="radio" id="patrol2" name="police_visibility" value="2">
+                    <label for="patrol2">2</label>
+                    <input type="radio" id="patrol3" name="police_visibility" value="3">
+                    <label for="patrol3">3</label>
+                    <input type="radio" id="patrol4" name="police_visibility" value="4">
+                    <label for="patrol4">4</label>
+                    <input type="radio" id="patrol5" name="police_visibility" value="5">
+                    <label for="patrol5">5</label>
+                </div>
+            </div>
+
+            <!-- Question 9: Number of officers -->
+            <div class="form-control">
+                <label>7. Do you feel the number of officers in your neighbourhood is...?
+                    <small>(1 = Far Too Few, 5 = More Than Enough)</small>
+                </label>
+                <div class="rating-options">
+                    <input type="radio" id="officers1" name="officer_quantity" value="1" required>
+                    <label for="officers1">1</label>
+                    <input type="radio" id="officers2" name="officer_quantity" value="2">
+                    <label for="officers2">2</label>
+                    <input type="radio" id="officers3" name="officer_quantity" value="3">
+                    <label for="officers3">3</label>
+                    <input type="radio" id="officers4" name="officer_quantity" value="4">
+                    <label for="officers4">4</label>
+                    <input type="radio" id="officers5" name="officer_quantity" value="5">
+                    <label for="officers5">5</label>
+                </div>
+            </div>
+
+            <!-- Question 10: Police response confidence -->
+            <div class="form-control">
+                <label>8. If a burglary happened right now, how confident are you the police would arrive quickly?
+                    <small>(1 = Not Confident at All, 5 = Very Confident)</small>
+                </label>
+                <div class="rating-options">
+                    <input type="radio" id="fast1" name="response_speed_confidence" value="1" required>
+                    <label for="fast1">1</label>
+                    <input type="radio" id="fast2" name="response_speed_confidence" value="2">
+                    <label for="fast2">2</label>
+                    <input type="radio" id="fast3" name="response_speed_confidence" value="3">
+                    <label for="fast3">3</label>
+                    <input type="radio" id="fast4" name="response_speed_confidence" value="4">
+                    <label for="fast4">4</label>
+                    <input type="radio" id="fast5" name="response_speed_confidence" value="5">
+                    <label for="fast5">5</label>
+                </div>
+            </div>
+
+            <!-- Question 11: Satisfaction with police response -->
+            <div class="form-control">
+                <label>9. How satisfied are you with the police response when a burglary is reported in your
+                    neighbourhood?
+                    <small>(1 = Very Dissatisfied, 5 = Very Satisfied)</small>
+                </label>
+                <div class="rating-options">
+                    <input type="radio" id="satisfy1" name="police_satisfaction" value="1" required>
+                    <label for="satisfy1">1</label>
+                    <input type="radio" id="satisfy2" name="police_satisfaction" value="2">
+                    <label for="satisfy2">2</label>
+                    <input type="radio" id="satisfy3" name="police_satisfaction" value="3">
+                    <label for="satisfy3">3</label>
+                    <input type="radio" id="satisfy4" name="police_satisfaction" value="4">
+                    <label for="satisfy4">4</label>
+                    <input type="radio" id="satisfy5" name="police_satisfaction" value="5">
+                    <label for="satisfy5">5</label>
+                </div>
+            </div>
             <!-- Question 3: Open text -->
             <div class="form-control">
-                <label for="concerns">3. What concerns you most about safety?</label>
+                <label for="concerns">10. What concerns you most about safety?</label>
                 <textarea id="concerns" name="concerns" rows="3" placeholder="Your thoughts…"></textarea>
             </div>
 
             <!-- Question 4: Open text -->
             <div class="form-control">
-                <label for="other">4. Any other comments or suggestions?</label>
+                <label for="other">11. Any other comments or suggestions?</label>
                 <textarea id="other" name="other" rows="2" placeholder="Optional"></textarea>
             </div>
 
@@ -79,12 +214,34 @@
     </div>
 
     <script>
-        document.getElementById('survey-form')
-            .addEventListener('submit', function (e) {
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('survey-form');
+            const warning = document.getElementById('form-warning');
+            const container = document.getElementById('feedback-container');
+
+            form.addEventListener('submit', function (e) {
                 e.preventDefault();
-                window.location.href = 'dashboard.html';
+
+                // if any required input/group is empty, show warning
+                if (!form.checkValidity()) {
+                    warning.style.display = 'block';
+                    form.reportValidity();  // triggers native tooltips too
+                    return;
+                }
+
+                // otherwise, hide warning and form, show thank you
+                warning.style.display = 'none';
+                form.style.display = 'none';
+
+                const msg = document.createElement('div');
+                msg.className = 'form-control';
+                msg.innerHTML = '<p>Your answers have been submitted.</p>';
+                container.appendChild(msg);
             });
+        });
     </script>
+
+
 </body>
 
 </html>

@@ -3,14 +3,13 @@
 <html lang="en">
 
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta charset="UTF-8">
   <title>Community Dashboard</title>
   <link rel="stylesheet" href="style.css">
   <!-- Leaflet CSS -->
-  <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
-        integrity="sha256-sA+e2poJLuV7QYbN8V+vB1p2jT6g0f3p4lzYxNakmfQ="
-        crossorigin="" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+    integrity="sha256-sA+e2poJLuV7QYbN8V+vB1p2jT6g0f3p4lzYxNakmfQ=" crossorigin="" />
 </head>
 
 <body>
@@ -23,34 +22,33 @@
     </nav>
   </header>
 
-<div class="dashboard-container">
-  <div class="dashboard-grid">
-    <div class="panel chart-panel">
-      <h2>Burglary Trends</h2>
-      <canvas id="lineChart"></canvas>
-    </div>
+  <div class="dashboard-container">
+    <div class="dashboard-grid">
+      <div class="panel chart-panel">
+        <h2>Burglary Trends</h2>
+        <canvas id="lineChart"></canvas>
+      </div>
 
-    <div class="panel seasonal-panel">
-      <h2>Seasonal Pattern</h2>
-      <canvas id="seasonalChart"></canvas>
-    </div>
+      <div class="panel seasonal-panel">
+        <h2>Seasonal Pattern</h2>
+        <canvas id="seasonalChart"></canvas>
+      </div>
 
-    <div class="panel map-panel">
-      <h2>Ward-Level Heatmap</h2>
-      <div id="map"></div>
-    </div>
+      <div class="panel map-panel">
+        <h2>Ward-Level Heatmap</h2>
+        <div id="map"></div>
+      </div>
 
-    <div class="panel recent-panel">
-      <h2>Last 6 Months</h2>
-      <div id="recentMap"></div>
+      <div class="panel recent-panel">
+        <h2>Last 6 Months</h2>
+        <div id="recentMap"></div>
+      </div>
     </div>
   </div>
-</div>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
-          integrity="sha256-mMBPkw0Yg/j5Pn0Bt3QlHhg/85vG3W5tAM3s65RjOcM="
-          crossorigin=""></script>
+    integrity="sha256-mMBPkw0Yg/j5Pn0Bt3QlHhg/85vG3W5tAM3s65RjOcM=" crossorigin=""></script>
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -60,10 +58,10 @@
     new Chart(ctx, {
       type: 'line',
       data: {
-        labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
         datasets: [{
           label: 'Monthly Burglaries',
-          data: [30,25,40,35,50,45,55,60,48,38,32,28],
+          data: [30, 25, 40, 35, 50, 45, 55, 60, 48, 38, 32, 28],
           borderColor: '#01579B',
           backgroundColor: 'rgba(2,136,209,0.3)',
           tension: 0.3,
@@ -128,12 +126,13 @@
 
     function getColor(d) {
       return d > 50 ? '#0D47A1' :
-             d > 40 ? '#1976D2' :
-             d > 30 ? '#2196F3' :
-             d > 20 ? '#64B5F6' :
-             d > 10 ? '#BBDEFB' :
-                      '#E3F2FD';
+        d > 40 ? '#1976D2' :
+          d > 30 ? '#2196F3' :
+            d > 20 ? '#64B5F6' :
+              d > 10 ? '#BBDEFB' :
+                '#E3F2FD';
     }
   </script>
 </body>
+
 </html>
