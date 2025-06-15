@@ -18,12 +18,14 @@ from shapely.geometry import shape
 
 import joblib
 from scipy.stats import entropy
+from helper import save_prediction
+
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 
 # Centralized data folder
-DATA_DIR = r"../data"
-MODEL_DIR = r"../models"
+DATA_DIR = r"data"
+MODEL_DIR = r"models"
 
 # The “master” CSV with all LSOA × month burglary counts and features
 MASTER_CSV_PATH  = os.path.join(DATA_DIR, "crime_fixed_data.csv")
@@ -117,6 +119,7 @@ app.layout = html.Div([
 
     dcc.Store(id="selected-ward", data=None),
     dcc.Store(id="sidebar-open", data=True),
+    dcc.Store(id="show-perception", data=False),
 
     # ── Toggle filters button ─────────────────────────────────────────────────
     html.Button(
@@ -247,7 +250,11 @@ app.layout = html.Div([
                 n_clicks=0,
                 style={"width": "100%"}
             ),
-
+            
+            html.Button("Perception Analysis",
+                        id="btn-perception",
+                        n_clicks=0,
+                        style={"width":"100%", "marginBottom":"1em"}),
         ],
         style=SIDEBAR_STYLE
     ),
@@ -269,6 +276,37 @@ app.layout = html.Div([
                 id="allocation-table-container",
                 style={"margin-top": "20px"}
             )
+        ]
+    ),
+    
+        # ─── Perception Analysis “modal” ────────────────────────────────────────
+    html.Div(
+        id="perception-window",
+        style={
+            "position": "fixed",
+            "top": "10%",
+            "left": "10%",
+            "width": "80%",
+            "height": "80%",
+            "backgroundColor": "white",
+            "zIndex": 2000,
+            "overflow": "auto",
+            "boxShadow": "0 4px 8px rgba(0,0,0,0.2)",
+            "display": "none"   # start hidden
+        },
+        children=[
+            html.Button("Close", id="close-perception", style={"float":"right"}),
+            html.H3("Perception vs Predicted Burglaries"),
+            dcc.Dropdown(
+                id="perception-level",
+                options=[
+                    {"label":"Ward-level","value":"ward"},
+                    {"label":"LSOA-level","value":"lsoa"}
+                ],
+                value="ward",
+                style={"width":"200px","marginBottom":"1em"}
+            ),
+            dcc.Graph(id="perception-graph")
         ]
     )
 ])
@@ -397,7 +435,44 @@ def handle_selection(map_click, back_click, search_click, search_value, mode):
     raise PreventUpdate
 
 
-from helper import save_prediction
+@app.callback(
+    Output("show-perception", "data"),
+    Input("btn-perception", "n_clicks"),
+    State("show-perception", "data"),
+)
+def toggle_perception(n, showing):
+    if n:
+        # flip it on click
+        return not showing
+    return showing
+
+# ─── Toggle the Perception window open/closed ─────────────────────────────
+@app.callback(
+    Output("perception-window", "style"),
+    Input("btn-perception", "n_clicks"),
+    Input("close-perception", "n_clicks"),
+    State("perception-window", "style"),
+)
+def toggle_perception_window(open_clicks, close_clicks, current_style):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        raise PreventUpdate
+    trigger = ctx.triggered[0]["prop_id"].split(".")[0]
+    style = current_style.copy()
+    if trigger == "btn-perception":
+        style["display"] = "block"
+    else:
+        style["display"] = "none"
+    return style
+
+# ─── Update the figure inside that window ─────────────────────────────────
+@app.callback(
+    Output("perception-graph", "figure"),
+    Input("perception-level", "value"),
+)
+def update_perception_graph(level):
+    return build_perception_figure(level=level)
+
 
 @app.callback(
     Output("error-message", "children"),
@@ -436,11 +511,26 @@ def predict_month(n_clicks, month_str):
     Input("apply-button", "n_clicks"),
     Input("predict-button", "n_clicks"),
     Input("data-mode", "value"),
-    Input("selected-ward", "data"),  # <-- new!
+    Input("selected-ward", "data"),
+    Input("btn-perception","n_clicks"),
+    State("show-perception","data"),
     State("level", "value"),
     State("past-range", "value"),
 )
-def unified_map_callback(apply_clicks, predict_clicks, mode, selected_ward, level, past_range):
+def unified_map_callback(apply_clicks, predict_clicks, mode, selected_ward, btn_perf_clicks, level, past_range, show_perc):
+    if show_perc:
+        # build your perception figure (you can copy/paste your build_perception_figure())
+        fig = build_perception_figure()
+        blank = px.choropleth_mapbox(
+            pd.DataFrame({"code":[],"count":[]}),
+            geojson=ward_geo, featureidkey="properties.GSS_Code",
+            locations="code", color="count",
+            mapbox_style="open-street-map",
+            center={"lat":51.5074,"lon":-0.1278}, zoom=10,
+        )
+        blank.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+        return fig, blank, FULL_MAP_STYLE, {"display":"none"}, html.Div()
+
     ctx = dash.callback_context
     if not ctx.triggered:
         raise PreventUpdate
@@ -692,6 +782,7 @@ def generate_map(mode, selected_ward, level, past_range=None):
     else:
         selected_code = selected_ward
 
+
     if mode == "past":
         y0, y1 = int(past_range[0]), int(past_range[1])
         df = df[(df.month.dt.year >= y0) & (df.month.dt.year <= y1)]
@@ -878,6 +969,53 @@ def generate_map(mode, selected_ward, level, past_range=None):
         FULL_MAP_STYLE,       # lsoa style
         html.Div()            # empty alloc container
     )
+
+# ─── Build the Perception vs Predicted Burglaries figure ─────────────────
+def build_perception_figure(level="ward"):
+    # 1) load predicted burglaries
+    df_pred = pd.read_csv(PRED_CSV_PATH)
+    # 2) load citizen safety data
+    survey_path = os.path.join(DATA_DIR, "survey_with_topics.csv")
+    df_survey = pd.read_csv(survey_path)
+    
+    survey_path = os.path.join(DATA_DIR, "survey_with_topics.csv")
+    df_survey = pd.read_csv(survey_path)
+
+    # rename the column exactly
+    df_survey.rename(columns={"LSOA code": "lsoa_code"}, inplace=True)
+
+    
+    # 3) choose aggregation key & geojson
+    if level == "ward":
+        df_pred["ward_code"]   = df_pred.lsoa_code.map(lsoa_to_ward)
+        df_survey["ward_code"] = df_survey.lsoa_code.map(lsoa_to_ward)
+        key_field = "ward_code"
+        geojson, featureid = ward_geo, "properties.GSS_Code"
+    else:
+        key_field = "lsoa_code"
+        geojson, featureid = lsoa_geo, "properties.LSOA11CD"
+    
+    # 4) aggregate both tables
+    pred_agg   = df_pred.groupby(key_field)["predicted_burglary"].sum().reset_index()
+    survey_agg = df_survey.groupby(key_field)["perceived_safety_score"].mean().reset_index()
+    df_merge   = pd.merge(pred_agg, survey_agg, on=key_field, how="inner")
+    df_merge["diff"] = df_merge["predicted_burglary"] - df_merge["perceived_safety_score"]
+    
+    # 5) choropleth
+    fig = px.choropleth_mapbox(
+        df_merge,
+        geojson=geojson,
+        featureidkey=featureid,
+        locations=key_field,
+        color="diff",
+        color_continuous_scale="RdBu",
+        center={"lat": 51.5074, "lon": -0.1278},
+        zoom=10,
+        mapbox_style="open-street-map",
+        labels={"diff": "Burglaries − Safety"}
+    )
+    fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
+    return fig
 
 
 if __name__ == "__main__":
