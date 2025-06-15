@@ -6,35 +6,24 @@ import glob
 from shapely.geometry import Point
 
 # Setup
-# os.makedirs("data", exist_ok=True)
-# crime_files = glob.glob("data/2019-to-2025/*.csv")
-# print(f"Found {len(crime_files)} crime files to combine.")
+os.makedirs("data", exist_ok=True)
+crime_files = glob.glob("../PolIce-force-bulgary-assistance/data/2019-to-2025/*.csv")
+print(f"Found {len(crime_files)} crime files to combine.")
 
-# # Combine crime data
-# combined_data = pd.concat([pd.read_csv(f) for f in crime_files], ignore_index=True)
-# combined_data.to_csv("data/combined_crime_2019-2025.csv", index=False, encoding="utf-8-sig")
+# Combine crime data
+combined_data = pd.concat([pd.read_csv(f) for f in crime_files], ignore_index=True)
+combined_data.to_csv("data/combined_crime_2019-2025.csv", index=False, encoding="utf-8-sig")
 combined_data = pd.read_csv("data/combined_crime_2019-2025.csv")
 
-combined_data.columns = (
-    combined_data.columns
-    .str.strip()
-    .str.lower()
-    .str.replace(" ", "_")
-    .str.replace(r"[^\w_]", "", regex=True)
-)
-# Filter for London LSOAs
-combined_data = combined_data[combined_data["lsoa_code"].astype(str).str.startswith("E01")]
-print("Filtered to London LSOAs:", combined_data["lsoa_code"].nunique(), "unique LSOAs remaining")
-
 # Load and clean stop and search data
-stop_and_search_data = pd.read_csv("data/stopandsearch2019.csv", skiprows=2, on_bad_lines='skip', engine="python")
+stop_and_search_data = pd.read_csv("../PolIce-force-bulgary-assistance/data/stopandsearch2019.csv", skiprows=2, on_bad_lines='skip', engine="python")
 stop_and_search_data.columns = stop_and_search_data.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
 stop_and_search_data["date"] = pd.to_datetime(stop_and_search_data["date"], errors="coerce")
 stop_and_search_data.dropna(subset=["date", "longitude", "latitude"], inplace=True)
 stop_and_search_data["month"] = stop_and_search_data["date"].dt.to_period("M").dt.to_timestamp()
 
 # Attach LSOA to stop and search
-lsoa_gdf = gpd.read_file("data/LSOAs.geojson")
+lsoa_gdf = gpd.read_file("../PolIce-force-bulgary-assistance/data/LSOAs.geojson")
 stop_and_search_data["geometry"] = stop_and_search_data.apply(lambda row: Point(row["longitude"], row["latitude"]), axis=1)
 stop_gdf = gpd.GeoDataFrame(stop_and_search_data, geometry="geometry", crs="EPSG:4326").to_crs(lsoa_gdf.crs)
 stop_with_lsoa = gpd.sjoin(stop_gdf, lsoa_gdf[["LSOA11CD", "geometry"]], how="left", predicate="within")
@@ -55,6 +44,14 @@ all_lsoas = combined_data["lsoa_code"].unique()
 all_months = pd.date_range(combined_data["month"].min(), combined_data["month"].max(), freq="MS")
 full_index = pd.MultiIndex.from_product([all_lsoas, all_months], names=["lsoa_code", "month"])
 full_df = pd.DataFrame(index=full_index).reset_index()
+
+# Merge population early
+pop = pd.read_csv("../PolIce-force-bulgary-assistance/data/Mid-2021-LSOA-2021.csv", delimiter=";")
+pop.columns = pop.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
+pop = pop.rename(columns={"lsoa_2021_code": "lsoa_code", "total": "population"})
+full_df = full_df.merge(pop[["lsoa_code", "population"]], on="lsoa_code", how="left")
+if "population" not in full_df.columns:
+    raise KeyError("Column 'population' is missing after merge. Please check the population CSV structure.")
 
 # Crime counts
 burglary_counts = combined_data[combined_data["crime_type"] == "burglary"].groupby(["lsoa_code", "month"]).size().reset_index(name="burglary_count")
@@ -89,6 +86,13 @@ for window in [3, 6, 12]:
     full_df[f"rolling_std_{window}"] = grouped["burglary_count"].shift(1).rolling(window).std()
     full_df[f"rolling_sum_{window}"] = grouped["burglary_count"].shift(1).rolling(window).sum()
 
+# Derived features
+full_df["delta_lag"] = full_df["lag_1"] - full_df["lag_2"]
+full_df["momentum"] = full_df["lag_1"] - full_df["lag_3"]
+full_df["stop_rate"] = full_df["stop_and_search_count"] / (full_df["population"] + 1)
+full_df["log_pop"] = np.log1p(full_df["population"])
+full_df["crime_per_capita"] = full_df["lag_1"] / (full_df["population"] + 1)
+
 # Time features
 full_df["month_num"] = full_df["month"].dt.month
 full_df["quarter"] = full_df["month"].dt.quarter
@@ -97,7 +101,7 @@ full_df["month_cos"] = np.cos(2 * np.pi * full_df["month_num"] / 12)
 full_df["is_winter"] = full_df["month_num"].isin([12, 1, 2]).astype(int)
 full_df["is_holiday_season"] = full_df["month_num"].isin([11, 12]).astype(int)
 
-# Merge IMD and population
+# Merge IMD
 imd = pd.read_csv("data/id-2019-for-london.csv", delimiter=";")
 imd.columns = imd.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
 imd = imd.rename(columns={
@@ -110,38 +114,6 @@ imd = imd.rename(columns={
 })
 full_df = full_df.merge(imd, on="lsoa_code", how="left")
 
-pop = pd.read_csv("data/Mid-2021-LSOA-2021.csv", delimiter=";")
-pop.columns = pop.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
-pop = pop.rename(columns={"lsoa_2021_code": "lsoa_code", "total": "population"})
-full_df = full_df.merge(pop[["lsoa_code", "population"]], on="lsoa_code", how="left")
-
-# Derived features
-full_df["log_pop"] = np.log1p(full_df["population"])
-full_df["crime_per_capita"] = full_df["lag_1"] / (full_df["population"] + 1)
-full_df["stop_rate"] = full_df["stop_and_search_count"] / (full_df["population"] + 1)
-full_df["imd_pop_interaction"] = full_df["imd_decile_2019"] * full_df["log_pop"]
-fill_cols = [c for c in full_df.columns if c.startswith(("lag_", "rolling_", "delta_", "momentum"))]
-full_df[fill_cols] = full_df[fill_cols].fillna(0)
-
-# Object of search feature engineering
-stop_with_lsoa["object_of_search"] = stop_with_lsoa["object_of_search"].str.lower()
-weapon_counts = stop_with_lsoa[stop_with_lsoa["object_of_search"].str.contains("weapon", na=False)].groupby(["lsoa_code", "month"]).size().reset_index(name="weapon_search_count")
-drug_counts = stop_with_lsoa[stop_with_lsoa["object_of_search"].str.contains("drug", na=False)].groupby(["lsoa_code", "month"]).size().reset_index(name="drug_search_count")
-full_df = full_df.merge(weapon_counts, on=["lsoa_code", "month"], how="left")
-full_df = full_df.merge(drug_counts, on=["lsoa_code", "month"], how="left")
-full_df[["weapon_search_count", "drug_search_count"]] = full_df[["weapon_search_count", "drug_search_count"]].fillna(0).astype(int)
-
-# Drop unnecessary columns
-full_df.drop(columns=[col for col in full_df.columns if "rolling_sum_" in col] + ["month_num", "stop_rate"], inplace=True, errors="ignore")
-
-# IMD interactions
-imd_cols = ["imd_decile_2019", "income_decile_2019", "employment_decile_2019", "crime_decile_2019", "health_decile_2019"]
-for col in imd_cols:
-    full_df[col] = full_df[col].astype("category")
-    full_df[f"{col}_x_sin"] = full_df[col].cat.codes * full_df["month_sin"]
-    full_df[f"{col}_x_cos"] = full_df[col].cat.codes * full_df["month_cos"]
-    full_df[f"{col}_x_quarter"] = full_df[col].cat.codes * full_df["quarter"]
-
-# Export final dataset
+# Export
 full_df.to_csv("data/XGBoost_ready_dataset.csv", index=False, encoding="utf-8-sig")
 print("Final row count:", full_df.shape[0])
