@@ -1,0 +1,16 @@
+import os
+import pandas as pd
+
+
+
+
+DATA_DIR = r"data"
+
+# load & normalize citizen safety survey
+survey_path = os.path.join(DATA_DIR, "survey_with_topics.csv")
+df_survey = pd.read_csv(survey_path)
+
+# rename the column exactly
+df_survey.rename(columns={"LSOA code": "lsoa_code"}, inplace=True)
+
+# now you can safely refer to df_survey.lsoa_code
