@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Community Dashboard</title>
+
+  <link rel="stylesheet" href="style.css" />
+
+  <script src="https://cdn.plot.ly/plotly-2.33.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    .long-panel  { grid-column: 1 / -1; }
+    .plotly-div  { width: 100%; height: 460px; }
+    #status, #error { font-weight: 600; margin-left: 12px; }
+    #status { color:#0d47a1; }
+    #error  { color:#c62828; }
+    .tabs { display:flex; gap:1rem; margin:1rem 0 0 24px; }
+    .tabs button { padding:0.4rem 0.8rem; border:none; cursor:pointer;
+                   background:#bbdefb; border-radius:4px; font-weight:600; }
+    .tabs button.active { background:#0d47a1; color:#fff; }
+    #tab-feedback { display:none; }
+  </style>
+</head>
+
+<body>
+  <header class="site-header">
+    <img src="public/images/metrobadge.png" alt="Metro Police" class="logo" />
+    <span class="site-title">Metropolitan Police</span>
+    <nav>
+      <a href="feedback.html" id="header-feedback">Give Feedback</a>
+      <a href="dashboard.html"  class="active">View Data</a>
+    </nav>
+  </header>
+
+  <div class="tabs">
+    <button id="btn-dash"     class="active">Burglary Dashboard</button>
+    <button id="btn-feedback">Community Survey</button>
+  </div>
+
+  <section id="tab-dash">
+    <div style="padding:24px">
+      <label style="font-weight:bold;margin-right:6px">Select Ward:</label>
+      <select id="wardSel" style="padding:4px 6px"></select>
+      <span id="status">Loading data…</span><span id="error"></span>
+    </div>
+
+    <div class="dashboard-container">
+      <div class="dashboard-grid">
+        <div class="panel long-panel">
+          <h2>Burglary Trends (London mean vs. Ward)</h2>
+          <div id="linePlot" class="plotly-div"></div>
+        </div>
+
+        <div class="panel long-panel">
+          <h2>Ward LSOA Distribution (last 12 months)</h2>
+          <div id="barPlot"  class="plotly-div"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───── Tab 2: feedback page in an iframe ───── -->
+  <section id="tab-feedback">
+    <iframe src="feedback.html"
+            style="width:100%;height:calc(100vh - 160px);border:none"></iframe>
+  </section>
+
+  <!-- ───── Main JS ───── -->
+  <script>
+  /* ---------- config ---------- */
+  const CRIME_CSV  = "data_ct/combined_crime_2019-2025.csv";
+  const LOOKUP_CSV = "data_ct/LSOA_(2021)_to_Electoral_Ward_(2024)_to_LAD_(2024)_Best_Fit_Lookup_in_EW.csv";
+
+  /* ---------- tiny helpers ---------- */
+  const $  = id => document.getElementById(id);
+  const showError  = msg => { $('error').textContent = msg; $('status').style.display='none'; };
+  const clearError = ()  => $('error').textContent = '';
+
+  const minusMonths = (ym, n) => {
+    const [Y,M]=ym.split('-').map(Number);
+    const d=new Date(Y, M-1-n); return d.toISOString().slice(0,7);
+  };
+  function* monthRange(start,end){
+    let [ys,ms]=start.split('-').map(Number);
+    const [ye,me]=end.split('-').map(Number);
+    while(ys<ye||(ys===ye&&ms<=me)){
+      yield `${ys}-${String(ms).padStart(2,'0')}`;
+      ms++; if(ms>12){ms=1; ys++; }
+    }
+  }
+
+  /* ---------- data containers ---------- */
+  const wardName   = new Map();                 // Ward→Name
+  const wardMonth  = new Map();                 // "YYYY-MM|Ward"→count
+  const lsoaCnt    = new Map();                 // "Ward|LSOA"→count
+  let monthsArr = [], londonMean = {};
+
+  /* ---------- 0. simple tab switch ---------- */
+  $('btn-dash').onclick = () => { showTab('dash'); };
+  $('btn-feedback').onclick = () => { showTab('feedback'); };
+  function showTab(tab){
+    $('tab-dash').style.display      = tab==='dash'?'block':'none';
+    $('tab-feedback').style.display  = tab==='feedback'?'block':'none';
+    $('btn-dash').classList.toggle('active',tab==='dash');
+    $('btn-feedback').classList.toggle('active',tab==='feedback');
+  }
+
+  /* ---------- 1. load lookup ---------- */
+  Papa.parse(LOOKUP_CSV, {
+    header:true, download:true, worker:false,
+    error: e => showError("Lookup CSV error: "+e),
+    complete: res=>{
+      res.data.forEach(r=> wardName.set(r.WD24CD, r.WD24NM));
+      if(!wardName.size) return showError("Lookup CSV is empty or malformed.");
+      loadCrime();
+    }
+  });
+
+  fetch(LOOKUP_CSV)
+  .then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status} loading lookup CSV`);
+    return r.text();
+  })
+  .then(txt => Papa.parse(txt, {header:true, complete: res => {/*…*/}}))
+  .catch(err => showError("Lookup CSV fetch failed: " + err.message));
+
+
+  /* ---------- 2. load crime CSV (stream) ---------- */
+  function loadCrime(){
+    const lsoaToWard = {};
+    // quickly fill LSOA→Ward from the lookup rows
+    Papa.parse(LOOKUP_CSV,{header:true,download:true,worker:false,
+      complete: r=> r.data.forEach(d=> lsoaToWard[d.LSOA21CD]=d.WD24CD)
+    });
+
+    let maxMonth=null, rows=[];
+    Papa.parse(CRIME_CSV,{
+      header:true, download:true, worker:false,
+      step: res=>{
+        const r=res.data;
+        if(r["Crime type"]!=="Burglary") return;
+        const ym=r.Month?.slice(0,7); if(!ym) return;
+        maxMonth = maxMonth ? (ym>maxMonth?ym:maxMonth) : ym;
+        rows.push({ym,lsoa:r["LSOA code"]});
+      },
+      error: e=> showError("Crime CSV error: "+e),
+      complete: ()=>aggregate(rows,maxMonth,lsoaToWard)
+    });
+  }
+
+  /* ---------- 3. aggregate ---------- */
+  function aggregate(rows,maxM,lsoaToWard){
+    const end   = minusMonths(maxM,3);
+    const start = minusMonths(end,11);
+    const monthsSet = new Set(monthRange(start,end));
+    monthsArr = Array.from(monthsSet).sort();
+
+    rows.forEach(({ym,lsoa})=>{
+      if(!monthsSet.has(ym)) return;
+      const w=lsoaToWard[lsoa]; if(!w) return;
+      const wmKey=`${ym}|${w}`;
+      wardMonth.set(wmKey,(wardMonth.get(wmKey)||0)+1);
+      const lwKey=`${w}|${lsoa}`;
+      lsoaCnt.set(lwKey,(lsoaCnt.get(lwKey)||0)+1);
+    });
+
+    monthsArr.forEach(m=>{
+      let sum=0, wards=0;
+      wardName.forEach((_,w)=>{
+        const v = wardMonth.get(`${m}|${w}`)||0;
+        if(v>0){ sum+=v; wards++;}
+      });
+      londonMean[m]=wards?sum/wards:0;
+    });
+
+    buildUI();
+  }
+
+  /* ---------- 4. UI + Plotly ---------- */
+  function buildUI(){
+    const sel=$('wardSel');
+    wardName.forEach((name,code)=>{
+      const opt=document.createElement('option');
+      opt.value=code; opt.textContent=`${code} – ${name}`;
+      sel.appendChild(opt);
+    });
+    $('status').style.display='none';
+    clearError();
+    sel.onchange=()=> render(sel.value);
+    render(sel.value);
+  }
+
+  function render(ward){
+    // line data
+    const wardSeries = monthsArr.map(m=> wardMonth.get(`${m}|${ward}`)||0);
+    const londonSer  = monthsArr.map(m=> londonMean[m]);
+
+    Plotly.newPlot('linePlot',[
+      {x:monthsArr,y:londonSer,name:'London mean / ward',
+       mode:'lines+markers',line:{dash:'dash'}},
+      {x:monthsArr,y:wardSeries,name:`${ward} total`,mode:'lines+markers'}
+    ],{
+      yaxis:{title:'Burglaries',range:[0,25],fixedrange:true},
+      xaxis:{title:'Month',tickangle:-45,fixedrange:true},
+      margin:{l:40,r:20,t:40,b:80},
+      legend:{orientation:'h',y:1.15,x:1}
+    },{responsive:true});
+
+    // bar data
+    const arr=[];
+    lsoaCnt.forEach((cnt,key)=>{
+      const [w,l]=key.split('|');
+      if(w===ward) arr.push([l,cnt]);
+    });
+    arr.sort((a,b)=>b[1]-a[1]);
+    Plotly.newPlot('barPlot',[
+      {x:arr.map(d=>d[0]),y:arr.map(d=>d[1]),type:'bar'}
+    ],{
+      yaxis:{title:'Burglaries',range:[0,30],fixedrange:true},
+      xaxis:{title:'LSOA',tickangle:45,fixedrange:true},
+      margin:{l:40,r:20,t:40,b:120}
+    },{responsive:true});
+  }
+  </script>
+</body>
+</html>
