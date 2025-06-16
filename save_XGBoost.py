@@ -23,6 +23,15 @@ for lag in [1, 3, 6, 12]:
     col = f"crime_count_pct_change_{lag}m"
     df[col] = df.groupby("lsoa_code")["crime_count"].pct_change(lag)
     df[col] = df[col].replace([np.inf, -np.inf], np.nan).fillna(0)
+    
+print("current df columns:", df.columns)
+    
+# Derived features
+df["delta_lag"] = df["lag_1"] - df["lag_2"]
+df["momentum"] = df["lag_1"] - df["lag_3"]
+df["stop_rate"] = df["stop_and_search_count"] / (df["population"] + 1)
+df["log_pop"] = np.log1p(df["population"])
+df["crime_per_capita"] = df["lag_1"] / (df["population"] + 1)
 
 df["month_num"] = df["month"].dt.month
 df["month_sin"] = np.sin(2 * np.pi * df["month_num"] / 12)

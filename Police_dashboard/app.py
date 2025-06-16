@@ -25,8 +25,8 @@ import random
 # ─── Paths ────────────────────────────────────────────────────────────────────
 
 # Centralized data folder
-DATA_DIR = r"C:\Users\mgshe\OneDrive - TU Eindhoven\Desktop\data challange\data"
-MODEL_DIR = r"C:\Users\mgshe\OneDrive - TU Eindhoven\Desktop\data challange\models"
+DATA_DIR = r"../data"
+MODEL_DIR = r"../models"
 
 # The “master” CSV with all LSOA × month burglary counts and features
 MASTER_CSV_PATH  = os.path.join(DATA_DIR, "crime_fixed_data.csv")
@@ -185,8 +185,6 @@ app.layout = html.Div([
                 id="pred-controls",
                 children=[
                     html.Br(),
-                    html.Div(id="error-message", children=[]),
-                    dcc.Textarea(placeholder="Enter future month (YYYY-MM)", id="predict-month", style={"width": "100%", "height": "30px"}),
                     html.Button(
                         "Predict Next Month",
                         id="predict-button",
@@ -338,7 +336,6 @@ def toggle_mode_controls(mode):
     Input("upload-file", "contents"),
     State("upload-file", "filename"),
 )
- 
 def handle_upload(contents, filename):    
     if contents is None:
         raise PreventUpdate
@@ -347,32 +344,38 @@ def handle_upload(contents, filename):
     decoded = base64.b64decode(content_string)
     try:
         df_new = pd.read_csv(io.StringIO(decoded.decode("utf-8")))
-        print("df new created")
+        print("df_new created")
         clean_df = clean_new_dataset(df_new)
-        print("clean df created")
+        print("clean_df created")
         update_model_with_new_data(clean_df)
         print("model updated")
         
-        # # Append to master CSV
-        # if not os.path.exists(MASTER_CSV_PATH):
-        #     raise FileNotFoundError(f"Master CSV not found at {MASTER_CSV_PATH}.")
+        # Append to master CSV
+        if not os.path.exists(MASTER_CSV_PATH):
+            return html.Div(f"Master CSV not found at {MASTER_CSV_PATH}.")
         
-        # df_master = pd.read_csv(MASTER_CSV_PATH)
+        df_master = pd.read_csv(MASTER_CSV_PATH)
+        clean_df = clean_df[df_master.columns]
         
-        # print("Difference: ", set(df_master.columns) - set(clean_df.columns))
-        # if df_master.columns != clean_df.columns:
-        #     raise ValueError("Uploaded CSV columns do not match master CSV columns.")
-        
-        # # Ensure no duplicates
-        # clean_df["month"] = pd.to_datetime(clean_df["month"])
-        # df_master["month"] = pd.to_datetime(df_master["month"])
+        print("Difference: ", set(df_master.columns) - set(clean_df.columns))
+        if sorted(df_master.columns) != sorted(clean_df.columns):
+            return html.Div("Uploaded CSV columns do not match master CSV columns.")
 
-        # # Remove rows from clean_df that already exist in df_master (by lsoa_code + month)
-        # existing_index = df_master.set_index(["lsoa_code", "month"]).index
-        # clean_df = clean_df[~clean_df.set_index(["lsoa_code", "month"]).index.isin(existing_index)]
+        # Ensure no duplicates
+        clean_df["month"] = pd.to_datetime(clean_df["month"])
+        df_master["month"] = pd.to_datetime(df_master["month"])
+
+        prev_len_clean = len(clean_df)
+
+        # Remove rows from clean_df that already exist in df_master (by lsoa_code + month)
+        existing_index = df_master.set_index(["lsoa_code", "month"]).index
+        clean_df = clean_df[~clean_df.set_index(["lsoa_code", "month"]).index.isin(existing_index)]
+        # print if any rows were removed
+        if len(clean_df) < prev_len_clean:
+            return html.Div("Data already exists, no new rows added.")
         
-        # df_master = pd.concat([df_master, clean_df], ignore_index=True)
-        # df_master.to_csv(MASTER_CSV_PATH, index=False, mode='w')
+        df_master = pd.concat([df_master, clean_df], ignore_index=True)
+        df_master.to_csv(MASTER_CSV_PATH, index=False, mode='w')
 
         return html.Div("New data uploaded successfully.")
     except Exception as e:
@@ -476,32 +479,21 @@ def update_perception_graph(level):
 
 
 @app.callback(
-    Output("error-message", "children"),
     Output("predict-button", "n_clicks"),  # reset the button
     Input("predict-button", "n_clicks"),
-    State("predict-month", "value")
 )
-def predict_month(n_clicks, month_str):
+def predict_month(n_clicks):
     if n_clicks == 0:
         raise PreventUpdate
 
-    if not month_str:
-        return html.Label("Please enter a month in YYYY-MM format."), 0
-
     try:
-        month = pd.to_datetime(month_str, format="%Y-%m")
-        if month < pd.Timestamp.now():
-            return html.Label("Error: Cannot predict for past months."), 0
-    except ValueError:
-        return html.Label("Error: Invalid date format. Use YYYY-MM."), 0
-
-    try:
-        print("Predicting for month:", month_str)
-        save_prediction(model, scaler, month_str)
-        return html.Label(f"Prediction for {month_str} saved successfully."), 0
+        month = (pd.Timestamp.now() + pd.DateOffset(months=1)).strftime("%Y-%m-%d")
+        print("Predicting for month:", month)
+        save_prediction(model, scaler, month)
+        return 0
     except Exception as e:
         print("Prediction error:", e)
-        return html.Label("Error running prediction. Check logs."), 0
+        return 0
 
 @app.callback(
     Output("map-ward", "figure"),
@@ -555,13 +547,15 @@ def update_model_with_new_data(new_df: pd.DataFrame):
         'crime_score', 'index_of_multiple_deprivation_imd_score', 'employment_score_rate',
         'local_authority_district_code_2019', 'local_authority_district_name_2019',
         'income_score_rate', 'barriers_to_housing_and_services_score', 'education_skills_and_training_score',
-        'quarter', 'month_num', 'lsoa_name', 'health_deprivation_and_disability_score', 'living_environment_score'
+        'quarter', 'month_num', 'lsoa_name', 'health_deprivation_and_disability_score', 'living_environment_score',
     }
     features = [c for c in new_df.columns if c not in exclude_cols]
     target_col = "burglary_count"
+    
+    trained_features = scaler.feature_names_in_.tolist()
+    X_sorted_cols = new_df[trained_features]
 
-    X_new = scaler.transform(new_df[features])
-    print("x good")
+    X_new = scaler.transform(X_sorted_cols)
     y_new = new_df[target_col].values
     model.fit(X_new, y_new, xgb_model=model)
     joblib.dump(model, MODEL_PATH)
@@ -577,7 +571,7 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     )
     # Filter for London LSOAs
     df = df[df["lsoa_code"].astype(str).str.startswith("E01")]
-    print("Filtered to London LSOAs:", df["lsoa_code"].nunique(), "unique LSOAs remaining")
+    # print("Filtered to London LSOAs:", df["lsoa_code"].nunique(), "unique LSOAs remaining")
 
     # Load and clean stop and search data
     stop_and_search_data = pd.read_csv(STOP_SEARCH_PATH, skiprows=2, on_bad_lines='skip', engine="python")
@@ -613,6 +607,14 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     burglary_counts = df[df["crime_type"] == "burglary"].groupby(["lsoa_code", "month"]).size().reset_index(name="burglary_count")
     crime_counts_total = df.groupby(["lsoa_code", "month"]).size().reset_index(name="crime_count")
 
+    # Merge population early
+    pop = pd.read_csv(MID_LSOA_PATH, delimiter=";")
+    pop.columns = pop.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
+    pop = pop.rename(columns={"lsoa_2021_code": "lsoa_code", "total": "population"})
+    full_df = full_df.merge(pop[["lsoa_code", "population"]], on="lsoa_code", how="left")
+    if "population" not in full_df.columns:
+        raise KeyError("Column 'population' is missing after merge. Please check the population CSV structure.")
+
     # Merge counts
     full_df = full_df.merge(burglary_counts, on=["lsoa_code", "month"], how="left")
     full_df = full_df.merge(crime_counts_total, on=["lsoa_code", "month"], how="left")
@@ -642,6 +644,13 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
         full_df[f"rolling_std_{window}"] = grouped["burglary_count"].shift(1).rolling(window).std()
         full_df[f"rolling_sum_{window}"] = grouped["burglary_count"].shift(1).rolling(window).sum()
 
+    # Derived features
+    full_df["delta_lag"] = full_df["lag_1"] - full_df["lag_2"]
+    full_df["momentum"] = full_df["lag_1"] - full_df["lag_3"]
+    full_df["stop_rate"] = full_df["stop_and_search_count"] / (full_df["population"] + 1)
+    full_df["log_pop"] = np.log1p(full_df["population"])
+    full_df["crime_per_capita"] = full_df["lag_1"] / (full_df["population"] + 1)
+
     # Time features
     full_df["month_num"] = full_df["month"].dt.month
     full_df["quarter"] = full_df["month"].dt.quarter
@@ -653,7 +662,6 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     # Merge IMD and population
     imd = pd.read_csv(ID_DATA_PATH, delimiter=";")
     imd.columns = imd.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
-    print("IMD columns:", imd.columns.tolist())
     imd = imd.rename(columns={
         "lsoa_code_(2011)": "lsoa_code",
         "index_of_multiple_deprivation_imd_decile_where_1_is_most_deprived_10_of_lsoas": "imd_decile_2019",
@@ -664,15 +672,7 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     })
     full_df = full_df.merge(imd, on="lsoa_code", how="left")
 
-    pop = pd.read_csv(MID_LSOA_PATH, delimiter=";")
-    pop.columns = pop.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
-    pop = pop.rename(columns={"lsoa_2021_code": "lsoa_code", "total": "population"})
-    full_df = full_df.merge(pop[["lsoa_code", "population"]], on="lsoa_code", how="left")
-
     # Derived features
-    full_df["log_pop"] = np.log1p(full_df["population"])
-    full_df["crime_per_capita"] = full_df["lag_1"] / (full_df["population"] + 1)
-    full_df["stop_rate"] = full_df["stop_and_search_count"] / (full_df["population"] + 1)
     full_df["imd_pop_interaction"] = full_df["imd_decile_2019"] * full_df["log_pop"]
     fill_cols = [c for c in full_df.columns if c.startswith(("lag_", "rolling_", "delta_", "momentum"))]
     full_df[fill_cols] = full_df[fill_cols].fillna(0)
@@ -686,7 +686,7 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
     full_df[["weapon_search_count", "drug_search_count"]] = full_df[["weapon_search_count", "drug_search_count"]].fillna(0).astype(int)
 
     # Drop unnecessary columns
-    full_df.drop(columns=[col for col in full_df.columns if "rolling_sum_" in col] + ["month_num", "stop_rate"], inplace=True, errors="ignore")
+    # full_df.drop(columns=[col for col in full_df.columns if "rolling_sum_" in col] + ["month_num"], inplace=True, errors="ignore")
 
     # IMD interactions
     imd_cols = ["imd_decile_2019", "income_decile_2019", "employment_decile_2019", "crime_decile_2019", "health_decile_2019"]
@@ -707,12 +707,6 @@ def clean_new_dataset(df: pd.DataFrame) -> pd.DataFrame:
         col = f"crime_count_pct_change_{lag}m"
         full_df[col] = full_df.groupby("lsoa_code")["crime_count"].pct_change(lag)
         full_df[col] = full_df[col].replace([np.inf, -np.inf], np.nan).fillna(0)
-
-    full_df["month_num"] = full_df["month"].dt.month
-    full_df["month_sin"] = np.sin(2 * np.pi * full_df["month_num"] / 12)
-    full_df["month_cos"] = np.cos(2 * np.pi * full_df["month_num"] / 12)
-    full_df["quarter"] = full_df["month"].dt.quarter
-    full_df["is_holiday"] = full_df["month_num"].isin([11, 12]).astype(int)
 
     if "crime_count_lag_1m" not in full_df.columns:
         full_df["crime_count_lag_1m"] = full_df.groupby("lsoa_code")["crime_count"].shift(1).fillna(0)
@@ -1112,7 +1106,7 @@ def Combine_LSOAs_Wards_predictions(selected_month): #Selected month is for what
     ).reset_index(drop=True)
     return lsoa_pct_ward
 def Generate_schedules():
-    lsoa_pct_ward = Combine_LSOAs_Wards_predictions("2025-02-01") #CHANGE THIS! this has to be the selected month (predicted)
+    lsoa_pct_ward = Combine_LSOAs_Wards_predictions((pd.Timestamp.now() + pd.DateOffset(months=1)).strftime("%Y-%m-%d"))
 
     # the 4 fucky LSOAs
     new_rows_data = [

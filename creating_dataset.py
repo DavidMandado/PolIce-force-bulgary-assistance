@@ -46,7 +46,7 @@ full_index = pd.MultiIndex.from_product([all_lsoas, all_months], names=["lsoa_co
 full_df = pd.DataFrame(index=full_index).reset_index()
 
 # Merge population early
-pop = pd.read_csv("../PolIce-force-bulgary-assistance/data/Mid-2021-LSOA-2021.csv", delimiter=";")
+pop = pd.read_csv("data/Mid-2021-LSOA-2021.csv", delimiter=";")
 pop.columns = pop.columns.str.strip().str.lower().str.replace(" ", "_").str.replace(r"[^\w_]", "", regex=True)
 pop = pop.rename(columns={"lsoa_2021_code": "lsoa_code", "total": "population"})
 full_df = full_df.merge(pop[["lsoa_code", "population"]], on="lsoa_code", how="left")
