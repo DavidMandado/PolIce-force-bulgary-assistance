@@ -283,10 +283,10 @@ app.layout = html.Div([
         id="perception-window",
         style={
             "position": "fixed",
-            "top": "10%",
+            "top": "5%",
             "left": "10%",
             "width": "80%",
-            "height": "80%",
+            "height": "90%",
             "backgroundColor": "white",
             "zIndex": 2000,
             "overflow": "auto",
@@ -296,15 +296,6 @@ app.layout = html.Div([
         children=[
             html.Button("Close", id="close-perception", style={"float":"right"}),
             html.H3("Perception vs Predicted Burglaries"),
-            dcc.Dropdown(
-                id="perception-level",
-                options=[
-                    {"label":"Ward-level","value":"ward"},
-                    {"label":"LSOA-level","value":"lsoa"}
-                ],
-                value="ward",
-                style={"width":"200px","marginBottom":"1em"}
-            ),
             dcc.Graph(id="perception-graph")
         ]
     )
@@ -469,15 +460,6 @@ def toggle_perception_window(open_clicks, close_clicks, current_style):
         style["display"] = "none"
     return style
 
-# ─── Update the figure inside that window ─────────────────────────────────
-@app.callback(
-    Output("perception-graph", "figure"),
-    Input("perception-level", "value"),
-)
-def update_perception_graph(level):
-    return build_perception_figure(level=level)
-
-
 @app.callback(
     Output("predict-button", "n_clicks"),  # reset the button
     Input("predict-button", "n_clicks"),
@@ -494,6 +476,22 @@ def predict_month(n_clicks):
     except Exception as e:
         print("Prediction error:", e)
         return 0
+    
+@app.callback(
+    Output("perception-graph", "figure"),
+    Input("btn-perception","n_clicks"),
+    Input("show-perception", "data"),
+)
+def perception_callback(n_clicks, show_perc):
+    if not show_perc:
+        raise PreventUpdate
+
+    try:
+        fig = build_perception_figure()
+        return fig
+    except Exception as e:
+        print("Error building perception figure:", e)
+        return px.Figure()
 
 @app.callback(
     Output("map-ward", "figure"),
@@ -505,25 +503,10 @@ def predict_month(n_clicks):
     Input("predict-button", "n_clicks"),
     Input("data-mode", "value"),
     Input("selected-ward", "data"),
-    Input("btn-perception","n_clicks"),
-    State("show-perception","data"),
     State("level", "value"),
     State("past-range", "value"),
 )
-def unified_map_callback(apply_clicks, predict_clicks, mode, selected_ward, btn_perf_clicks, level, past_range, show_perc):
-    if show_perc:
-        # build your perception figure (you can copy/paste your build_perception_figure())
-        fig = build_perception_figure()
-        blank = px.choropleth_mapbox(
-            pd.DataFrame({"code":[],"count":[]}),
-            geojson=ward_geo, featureidkey="properties.GSS_Code",
-            locations="code", color="count",
-            mapbox_style="open-street-map",
-            center={"lat":51.5074,"lon":-0.1278}, zoom=10,
-        )
-        blank.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-        return fig, blank, FULL_MAP_STYLE, {"display":"none"}, html.Div()
-
+def unified_map_callback(apply_clicks, predict_clicks, mode, selected_ward, level, past_range):
     ctx = dash.callback_context
     if not ctx.triggered:
         raise PreventUpdate
@@ -538,6 +521,34 @@ def unified_map_callback(apply_clicks, predict_clicks, mode, selected_ward, btn_
 
     raise PreventUpdate
 
+def build_perception_figure():
+    sentiment_summary = pd.read_csv(os.path.join(DATA_DIR, "sentiment_summary.csv"))
+    
+    topic_sentiment = (
+        sentiment_summary.groupby('matched_topics')
+        .agg(mean_sentiment=('avg_sentiment', 'mean'))
+        .reset_index()
+        .sort_values(by='mean_sentiment', ascending=True)
+    )
+    
+    fig = px.bar(
+        topic_sentiment,
+        x='matched_topics',
+        y='mean_sentiment',
+        title='Mean Sentiment Score by Topic',
+        labels={'matched_topics': 'Topic', 'mean_sentiment': 'Mean Sentiment'}
+    )
+
+    fig.update_layout(
+        xaxis_tickangle=-45,
+        yaxis_title='Mean Sentiment Score',
+        height=500,
+        margin={"r":0,"t":60,"l":0,"b":0},
+        template="plotly_white",
+
+    )
+    
+    return fig
 
 
 def update_model_with_new_data(new_df: pd.DataFrame):

@@ -11,7 +11,7 @@ import joblib
 import os
 
 # load the dataset
-df = pd.read_csv("data/XGBoost_ready_dataset.csv")
+df = pd.read_csv("data/XGBoost_ready_dataset.csv", low_memory=False)
 df["month"] = pd.to_datetime(df["month"])
 df["year_month"] = df["month"].dt.to_period("M")
 df = df[df["burglary_count"].notna() & (df["burglary_count"] >= 0)].copy()
@@ -23,8 +23,6 @@ for lag in [1, 3, 6, 12]:
     col = f"crime_count_pct_change_{lag}m"
     df[col] = df.groupby("lsoa_code")["crime_count"].pct_change(lag)
     df[col] = df[col].replace([np.inf, -np.inf], np.nan).fillna(0)
-    
-print("current df columns:", df.columns)
     
 # Derived features
 df["delta_lag"] = df["lag_1"] - df["lag_2"]
