@@ -975,6 +975,40 @@ def generate_map(mode, selected_ward, level, past_range=None):
         FULL_MAP_STYLE,       # lsoa style
         html.Div()            # empty alloc container
     )
+
+
+@app.callback(
+    Output("download-schedule", "data"),
+    Input("Schedule Button", "n_clicks"),
+    Input("selected-ward", "data"),
+    prevent_initial_call=True
+)
+def download_schedule(n_clicks, selected_ward):
+    if not selected_ward:
+        # Serve full schedule
+        path = os.path.join(DATA_DIR, "All_wards_patrol_schedule.csv")
+        return dcc.send_file(path)
+    else:
+        ward_name = selected_ward["code"]
+        ward_display_name = ward_mapping.get(ward_name, ward_name)
+        df = get_ward_schedule(ward_display_name)
+        temp_path = os.path.join(DATA_DIR, f"{ward_display_name}_schedule.csv")
+        df.to_csv(temp_path, index=False)
+        return dcc.send_file(temp_path)
+
+
+@app.callback(
+    Output("generate-schedule-button", "children"),
+    Input("selected-ward", "data")
+)
+def update_button_label(selected_ward):
+    if not selected_ward:
+        return "Download All Ward Schedules"
+    else:
+        ward_code = selected_ward["code"]
+        return f"Download {ward_mapping.get(ward_code, ward_code)} Schedule"
+
+
 def Combine_LSOAs_Wards_predictions(selected_month): #Selected month is for what month of the predicted data we wanna try to schedule
     lsoas = WARD_GEOJSON
     wards = LSOA_GEOJSON
