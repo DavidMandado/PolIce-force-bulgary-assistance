@@ -185,8 +185,6 @@ app.layout = html.Div([
                 id="pred-controls",
                 children=[
                     html.Br(),
-                    html.Div(id="error-message", children=[]),
-                    dcc.Textarea(placeholder="Enter future month (YYYY-MM)", id="predict-month", style={"width": "100%", "height": "30px"}),
                     html.Button(
                         "Predict Next Month",
                         id="predict-button",
@@ -203,13 +201,6 @@ app.layout = html.Div([
                             "borderWidth": "1px", "borderStyle": "dashed",
                             "borderRadius": "5px", "textAlign": "center"
                         }
-                    ),
-                    html.Br(),
-                    html.Button(
-                        "Download Schedule CSV",
-                        id="Schedule Button",
-                        n_clicks=0,
-                        style={"width": "100%"}
                     ),
                 ],
                 style={"display": "none"}
@@ -292,10 +283,10 @@ app.layout = html.Div([
         id="perception-window",
         style={
             "position": "fixed",
-            "top": "10%",
+            "top": "5%",
             "left": "10%",
             "width": "80%",
-            "height": "80%",
+            "height": "90%",
             "backgroundColor": "white",
             "zIndex": 2000,
             "overflow": "auto",
@@ -305,15 +296,6 @@ app.layout = html.Div([
         children=[
             html.Button("Close", id="close-perception", style={"float":"right"}),
             html.H3("Perception vs Predicted Burglaries"),
-            dcc.Dropdown(
-                id="perception-level",
-                options=[
-                    {"label":"Ward-level","value":"ward"},
-                    {"label":"LSOA-level","value":"lsoa"}
-                ],
-                value="ward",
-                style={"width":"200px","marginBottom":"1em"}
-            ),
             dcc.Graph(id="perception-graph")
         ]
     )
@@ -478,15 +460,6 @@ def toggle_perception_window(open_clicks, close_clicks, current_style):
         style["display"] = "none"
     return style
 
-# ─── Update the figure inside that window ─────────────────────────────────
-@app.callback(
-    Output("perception-graph", "figure"),
-    Input("perception-level", "value"),
-)
-def update_perception_graph(level):
-    return build_perception_figure(level=level)
-
-
 @app.callback(
     Output("predict-button", "n_clicks"),  # reset the button
     Input("predict-button", "n_clicks"),
@@ -503,7 +476,7 @@ def predict_month(n_clicks):
     except Exception as e:
         print("Prediction error:", e)
         return 0
-
+    
 @app.callback(
     Output("perception-graph", "figure"),
     Input("btn-perception","n_clicks"),
@@ -530,25 +503,10 @@ def perception_callback(n_clicks, show_perc):
     Input("predict-button", "n_clicks"),
     Input("data-mode", "value"),
     Input("selected-ward", "data"),
-    Input("btn-perception","n_clicks"),
-    State("show-perception","data"),
     State("level", "value"),
     State("past-range", "value"),
 )
-def unified_map_callback(apply_clicks, predict_clicks, mode, selected_ward, btn_perf_clicks, level, past_range, show_perc):
-    if show_perc:
-        # build your perception figure (you can copy/paste your build_perception_figure())
-        fig = build_perception_figure()
-        blank = px.choropleth_mapbox(
-            pd.DataFrame({"code":[],"count":[]}),
-            geojson=ward_geo, featureidkey="properties.GSS_Code",
-            locations="code", color="count",
-            mapbox_style="open-street-map",
-            center={"lat":51.5074,"lon":-0.1278}, zoom=10,
-        )
-        blank.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
-        return fig, blank, FULL_MAP_STYLE, {"display":"none"}, html.Div()
-
+def unified_map_callback(apply_clicks, predict_clicks, mode, selected_ward, level, past_range):
     ctx = dash.callback_context
     if not ctx.triggered:
         raise PreventUpdate
@@ -565,14 +523,14 @@ def unified_map_callback(apply_clicks, predict_clicks, mode, selected_ward, btn_
 
 def build_perception_figure():
     sentiment_summary = pd.read_csv(os.path.join(DATA_DIR, "sentiment_summary.csv"))
-
+    
     topic_sentiment = (
         sentiment_summary.groupby('matched_topics')
         .agg(mean_sentiment=('avg_sentiment', 'mean'))
         .reset_index()
         .sort_values(by='mean_sentiment', ascending=True)
     )
-
+    
     fig = px.bar(
         topic_sentiment,
         x='matched_topics',
@@ -589,7 +547,7 @@ def build_perception_figure():
         template="plotly_white",
 
     )
-
+    
     return fig
 
 
@@ -1017,36 +975,6 @@ def generate_map(mode, selected_ward, level, past_range=None):
         FULL_MAP_STYLE,       # lsoa style
         html.Div()            # empty alloc container
     )
-
-@app.callback(
-    Output("download-schedule", "data"),
-    Input("Schedule Button", "n_clicks"),
-    Input("selected-ward", "data"),
-    prevent_initial_call=True
-)
-def download_schedule(n_clicks, selected_ward):
-    if not selected_ward:
-        # Serve full schedule
-        path = os.path.join(DATA_DIR, "All_wards_patrol_schedule.csv")
-        return dcc.send_file(path)
-    else:
-        ward_name = selected_ward["code"]
-        ward_display_name = ward_mapping.get(ward_name, ward_name)
-        df = get_ward_schedule(ward_display_name)
-        temp_path = os.path.join(DATA_DIR, f"{ward_display_name}_schedule.csv")
-        df.to_csv(temp_path, index=False)
-        return dcc.send_file(temp_path)
-
-@app.callback(
-    Output("generate-schedule-button", "children"),
-    Input("selected-ward", "data")
-)
-def update_button_label(selected_ward):
-    if not selected_ward:
-        return "Download All Ward Schedules"
-    else:
-        ward_code = selected_ward["code"]
-        return f"Download {ward_mapping.get(ward_code, ward_code)} Schedule"
 def Combine_LSOAs_Wards_predictions(selected_month): #Selected month is for what month of the predicted data we wanna try to schedule
     lsoas = WARD_GEOJSON
     wards = LSOA_GEOJSON
