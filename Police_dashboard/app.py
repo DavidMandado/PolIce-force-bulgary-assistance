@@ -202,6 +202,13 @@ app.layout = html.Div([
                             "borderRadius": "5px", "textAlign": "center"
                         }
                     ),
+                    html.Br(),
+                    html.Button(
+                        "Download Schedule CSV",
+                        id="Schedule Button",
+                        n_clicks=0,
+                        style={"width": "100%"}
+                    ),
                 ],
                 style={"display": "none"}
             ),
