@@ -976,7 +976,6 @@ def generate_map(mode, selected_ward, level, past_range=None):
         html.Div()            # empty alloc container
     )
 
-
 @app.callback(
     Output("download-schedule", "data"),
     Input("Schedule Button", "n_clicks"),
