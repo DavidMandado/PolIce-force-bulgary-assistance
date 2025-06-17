@@ -159,7 +159,7 @@ function buildUI() {
   wardName.forEach((name, code) => {
     const opt = document.createElement("option");
     opt.value = code;
-    opt.textContent = `${code} – ${name}`;
+    opt.textContent = `${name} - ${code}`;
     sel.appendChild(opt);
   });
   $("status").style.display = "none";
