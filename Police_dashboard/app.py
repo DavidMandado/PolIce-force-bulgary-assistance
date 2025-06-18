@@ -25,8 +25,8 @@ import random
 # ─── Paths ────────────────────────────────────────────────────────────────────
 
 # Centralized data folder
-DATA_DIR = r"../data"
-MODEL_DIR = r"../models"
+DATA_DIR = r"data"
+MODEL_DIR = r"models"
 
 # The “master” CSV with all LSOA × month burglary counts and features
 MASTER_CSV_PATH  = os.path.join(DATA_DIR, "crime_fixed_data.csv")
@@ -181,18 +181,12 @@ app.layout = html.Div([
             ),
 
             # ── Predicted Controls (only when “Predicted Data”) ─────────────────
+
             html.Div(
                 id="pred-controls",
                 children=[
                     html.Br(),
-                    html.Button(
-                        "Predict Next Month",
-                        id="predict-button",
-                        n_clicks=0,
-                        style={"width": "100%"}
-                    ),
-                    html.Br(), html.Br(),
-                    html.Label("Upload New Monthly CSV:"),
+                    html.Label("Upload New Monthly CSV:"),               # 1️⃣ Upload first
                     dcc.Upload(
                         id="upload-file",
                         children=html.Div(["Drag & Drop or ", html.A("Select CSV")]),
@@ -202,7 +196,14 @@ app.layout = html.Div([
                             "borderRadius": "5px", "textAlign": "center"
                         }
                     ),
-                    html.Br(),
+                    html.Br(), html.Br(),
+                    html.Button(                                        # 2️⃣ Then Predict
+                        "Predict Next Month",
+                        id="predict-button",
+                        n_clicks=0,
+                        style={"width": "100%", "background-color": "#007bff", "color": "white"}
+                    ),
+                    html.Br(), html.Br(),
                     html.Button(
                         "Download Schedule CSV",
                         id="Schedule Button",
@@ -288,18 +289,22 @@ app.layout = html.Div([
         # ─── Perception Analysis “modal” ────────────────────────────────────────
     html.Div(
         id="perception-window",
-        style={
-            "position": "fixed",
-            "top": "5%",
-            "left": "10%",
-            "width": "80%",
-            "height": "90%",
-            "backgroundColor": "white",
-            "zIndex": 2000,
-            "overflow": "auto",
-            "boxShadow": "0 4px 8px rgba(0,0,0,0.2)",
-            "display": "none"   # start hidden
-        },
+    style={
+        "position": "fixed",
+        "top": "5%",
+        "left": "10%",
+        "width": "80%",
+        "height": "90vh",              # full viewport height
+        "backgroundColor": "white",
+        "zIndex": 2000,
+        "boxShadow": "0 4px 8px rgba(0,0,0,0.2)",
+        "display": "none",             # still hidden by default
+        "padding": "1rem",
+
+        # make this a flex container
+        "display": "flex",
+        "flexDirection": "column",
+    },
         children=[
             html.Button("Close", id="close-perception", style={"float":"right"}),
             html.H3("Perception vs Predicted Burglaries"),
@@ -529,7 +534,7 @@ def unified_map_callback(apply_clicks, predict_clicks, mode, selected_ward, leve
     raise PreventUpdate
 
 def build_perception_figure():
-    sentiment_summary = pd.read_csv(os.path.join(DATA_DIR, "sentiment_summary.csv"))
+    sentiment_summary = pd.read_csv(os.path.join(DATA_DIR, "topic_sentiment_summary.csv"))
     
     topic_sentiment = (
         sentiment_summary.groupby('matched_topics')
