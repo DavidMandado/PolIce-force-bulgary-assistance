@@ -1,6 +1,6 @@
 /* ---------- config ---------- */
-const CRIME_CSV = "../data/crime_fixed_data.csv";
-const LOOKUP_JSON = "../data/lsoa_to_ward.json";
+const CRIME_CSV = "/police-dashboard/api/crime-data";
+const LOOKUP_JSON = "/police-dashboard/api/lookup";
 
 /* ---------- tiny helpers ---------- */
 const $ = (id) => document.getElementById(id);

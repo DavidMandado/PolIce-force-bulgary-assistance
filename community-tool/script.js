@@ -12,7 +12,7 @@ document.getElementById('login-form').onsubmit = e => {
 };
 
 document.getElementById('police-btn').onclick = () =>
-  window.location.href = 'restricted.html';
+  window.location.href = 'police-dashboard';
 
 // 2) Seasonal Chart (bar per month)
 const ctx2 = document.getElementById('seasonalChart').getContext('2d');

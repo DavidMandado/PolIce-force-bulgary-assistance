@@ -10,6 +10,8 @@ from dash import dcc, html, dash_table
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
+from flask import Flask, send_from_directory
+
 import pandas as pd
 import geopandas as gpd
 import plotly.express as px
@@ -25,8 +27,8 @@ import random
 # ─── Paths ────────────────────────────────────────────────────────────────────
 
 # Centralized data folder
-DATA_DIR = r"data"
-MODEL_DIR = r"models"
+DATA_DIR = r"../data"
+MODEL_DIR = r"../models"
 
 # The “master” CSV with all LSOA × month burglary counts and features
 MASTER_CSV_PATH  = os.path.join(DATA_DIR, "crime_fixed_data.csv")
@@ -100,7 +102,33 @@ name_to_code = {name.lower(): code for code, name in ward_mapping.items()}
 
 
 # ─── 4) Start Dash App ──────────────────────────────────────────────────────
-app = dash.Dash(__name__)
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+COMMUNITY_DIR = os.path.join(BASE_DIR, "community-tool")
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+server = Flask(__name__)
+app = dash.Dash(
+    __name__,
+    server=server,
+    routes_pathname_prefix='/police-dashboard/',
+    requests_pathname_prefix='/police-dashboard/'
+)
+
+@server.route("/")
+def server_index():
+    return send_from_directory(COMMUNITY_DIR, "index.html")
+
+@server.route('/<path:path>')
+def serve_community_static(path):
+    return send_from_directory(COMMUNITY_DIR, path)
+
+@server.route("/police-dashboard/api/crime-data")
+def crime_data():
+    return send_from_directory(DATA_DIR, "crime_fixed_data.csv")
+
+@server.route("/police-dashboard/api/lookup")
+def lookup():
+    return send_from_directory(DATA_DIR, "lsoa_to_ward.json")
 
 # CSS styles
 SIDEBAR_STYLE = {
