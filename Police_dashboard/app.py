@@ -341,6 +341,35 @@ app.layout = html.Div([
     )
 ])
 
+@app.callback(
+    Output("download-schedule", "data"),
+    Input("Schedule Button", "n_clicks"),
+    Input("selected-ward", "data"),
+    prevent_initial_call=True
+)
+def download_schedule(n_clicks, selected_ward):
+    if not selected_ward:
+        # Serve full schedule
+        path = os.path.join(DATA_DIR, "All_wards_patrol_schedule.csv")
+        return dcc.send_file(path)
+    else:
+        ward_name = selected_ward["code"]
+        ward_display_name = ward_mapping.get(ward_name, ward_name)
+        df = get_ward_schedule(ward_display_name)
+        temp_path = os.path.join(DATA_DIR, f"{ward_display_name}_schedule.csv")
+        df.to_csv(temp_path, index=False)
+        return dcc.send_file(temp_path)
+    
+@app.callback(
+    Output("generate-schedule-button", "children"),
+    Input("selected-ward", "data")
+)
+def update_button_label(selected_ward):
+    if not selected_ward:
+        return "Download All Ward Schedules"
+    else:
+        ward_code = selected_ward["code"]
+        return f"Download {ward_mapping.get(ward_code, ward_code)} Schedule"
 
 # ─── 5) Callbacks ─────────────────────────────────────────────────────────────
 
@@ -474,6 +503,7 @@ def handle_selection(map_click, back_click, search_click, search_value, mode):
     Output("show-perception", "data"),
     Input("btn-perception", "n_clicks"),
     State("show-perception", "data"),
+    prevent_initial_call=True
 )
 def toggle_perception(n, showing):
     if n:
@@ -523,6 +553,8 @@ def predict_month(n_clicks):
     Input("show-perception", "data"),
 )
 def perception_callback(n_clicks, show_perc):
+    if n_clicks == 0:
+        raise PreventUpdate
     if not show_perc:
         raise PreventUpdate
 
@@ -1023,7 +1055,6 @@ def Combine_LSOAs_Wards_predictions(selected_month): #Selected month is for what
     joined = gpd.sjoin(lsoas, wards, how='inner', predicate='intersects')
     overlap_counts = joined.groupby(joined.index).size()
     lsoas_with_multiple_wards = overlap_counts[overlap_counts > 1]
-
     joined_multi = joined.loc[lsoas_with_multiple_wards.index]
 
     joined_multi = joined_multi.merge(
@@ -1155,6 +1186,7 @@ def Combine_LSOAs_Wards_predictions(selected_month): #Selected month is for what
         by=["Ward_code", "Burglary_Count"], ascending=[True, False]
     ).reset_index(drop=True)
     return lsoa_pct_ward
+
 def Generate_schedules():
     lsoa_pct_ward = Combine_LSOAs_Wards_predictions((pd.Timestamp.now() + pd.DateOffset(months=1)).strftime("%Y-%m-%d"))
 
