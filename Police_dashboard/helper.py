@@ -77,7 +77,7 @@ def build_forecast_rows(df: pd.DataFrame, forecast_month) -> pd.DataFrame:
     return new[df.columns]
 
 def save_prediction(model: XGBRegressor, scaler: RobustScaler, month):
-    df = pd.read_csv("data/XGBoost_ready_dataset_with_features.csv", parse_dates=["month", "year_month"])
+    df = pd.read_csv("../data/XGBoost_ready_dataset_with_features.csv", parse_dates=["month", "year_month"])
 
     features = scaler.feature_names_in_
 
@@ -90,5 +90,5 @@ def save_prediction(model: XGBRegressor, scaler: RobustScaler, month):
 
     # Save or concatenate with history
     next_rows[["lsoa_code", "year_month", "predicted_burglary"]].to_csv(
-        "data/burglary_next_month_forecast.csv", index=False
+        "../data/burglary_next_month_forecast.csv", index=False
     )

@@ -10,6 +10,8 @@ from dash import dcc, html, dash_table
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
+from flask import Flask, send_from_directory
+
 import pandas as pd
 import geopandas as gpd
 import plotly.express as px
@@ -25,8 +27,8 @@ import random
 # ─── Paths ────────────────────────────────────────────────────────────────────
 
 # Centralized data folder
-DATA_DIR = r"data"
-MODEL_DIR = r"models"
+DATA_DIR = r"../data"
+MODEL_DIR = r"../models"
 
 # The “master” CSV with all LSOA × month burglary counts and features
 MASTER_CSV_PATH  = os.path.join(DATA_DIR, "crime_fixed_data.csv")
@@ -100,7 +102,33 @@ name_to_code = {name.lower(): code for code, name in ward_mapping.items()}
 
 
 # ─── 4) Start Dash App ──────────────────────────────────────────────────────
-app = dash.Dash(__name__)
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+COMMUNITY_DIR = os.path.join(BASE_DIR, "community-tool")
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+server = Flask(__name__)
+app = dash.Dash(
+    __name__,
+    server=server,
+    routes_pathname_prefix='/police-dashboard/',
+    requests_pathname_prefix='/police-dashboard/'
+)
+
+@server.route("/")
+def server_index():
+    return send_from_directory(COMMUNITY_DIR, "index.html")
+
+@server.route('/<path:path>')
+def serve_community_static(path):
+    return send_from_directory(COMMUNITY_DIR, path)
+
+@server.route("/police-dashboard/api/crime-data")
+def crime_data():
+    return send_from_directory(DATA_DIR, "crime_fixed_data.csv")
+
+@server.route("/police-dashboard/api/lookup")
+def lookup():
+    return send_from_directory(DATA_DIR, "lsoa_to_ward.json")
 
 # CSS styles
 SIDEBAR_STYLE = {
@@ -309,7 +337,6 @@ app.layout = html.Div([
             html.Button("Close", id="close-perception", style={"float":"right"}),
             html.H3("Perception vs Predicted Burglaries"),
             dcc.Graph(id="perception-graph")
-            
         ]
     )
 ])
@@ -988,39 +1015,7 @@ def generate_map(mode, selected_ward, level, past_range=None):
         FULL_MAP_STYLE,       # lsoa style
         html.Div()            # empty alloc container
     )
-
-@app.callback(
-    Output("download-schedule", "data"),
-    Input("Schedule Button", "n_clicks"),
-    Input("selected-ward", "data"),
-    prevent_initial_call=True
-)
-def download_schedule(n_clicks, selected_ward):
-    if not selected_ward:
-        # Serve full schedule
-        path = os.path.join(DATA_DIR, "All_wards_patrol_schedule.csv")
-        return dcc.send_file(path)
-    else:
-        ward_name = selected_ward["code"]
-        ward_display_name = ward_mapping.get(ward_name, ward_name)
-        df = get_ward_schedule(ward_display_name)
-        temp_path = os.path.join(DATA_DIR, f"{ward_display_name}_schedule.csv")
-        df.to_csv(temp_path, index=False)
-        return dcc.send_file(temp_path)
-
-
-@app.callback(
-    Output("generate-schedule-button", "children"),
-    Input("selected-ward", "data")
-)
-def update_button_label(selected_ward):
-    if not selected_ward:
-        return "Download All Ward Schedules"
-    else:
-        ward_code = selected_ward["code"]
-        return f"Download {ward_mapping.get(ward_code, ward_code)} Schedule"
-
-
+    
 def Combine_LSOAs_Wards_predictions(selected_month): #Selected month is for what month of the predicted data we wanna try to schedule
     lsoas = WARD_GEOJSON
     wards = LSOA_GEOJSON
@@ -1028,9 +1023,7 @@ def Combine_LSOAs_Wards_predictions(selected_month): #Selected month is for what
     joined = gpd.sjoin(lsoas, wards, how='inner', predicate='intersects')
     overlap_counts = joined.groupby(joined.index).size()
     lsoas_with_multiple_wards = overlap_counts[overlap_counts > 1]
-    overlap_lsoas_names = lsoas.loc[lsoas_with_multiple_wards.index, "LSOA11NM"].tolist()
 
-    lsoas_multi = lsoas.loc[lsoas_with_multiple_wards.index]
     joined_multi = joined.loc[lsoas_with_multiple_wards.index]
 
     joined_multi = joined_multi.merge(
@@ -1204,7 +1197,7 @@ def Generate_schedules():
         match = lsoa_pct_ward['LSOA11NM'].str.contains(item["LSOA11NM"], case=False, na=False)
 
         # Apply the reduction to Burglary_Count
-        lsoa_pct_ward.loc[match, 'Burglary_Count'] = (lsoa_pct_ward.loc[match, 'Burglary_Count'] * item['reduction'])
+        lsoa_pct_ward.loc[match, 'Burglary_Count'] = lsoa_pct_ward.loc[match, 'Burglary_Count'].values * item['reduction']
         # modify burglary count
         original_row["Burglary_Count"] *= (1 - item["reduction"])
 
