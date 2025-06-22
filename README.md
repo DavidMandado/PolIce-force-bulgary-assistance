@@ -1,7 +1,7 @@
 # PolIce-force-bulgary-assistance
 TU/e Multidisciplinary CBL, helpin London police force reduce burlgary rates by predicting crime, allocating their police officers and adding our original twist by including the community in our innovative solution.
 
-This README will give the information necessary to run the project and a summary of its content.
+This README will give the information necessary to run the project and a summary of its content. This repository was created due to many members having issues in the git history after pushing big data files. This is the second repository used in the project, avoiding the previous problem using a detailed gitignore file. To access the previous repository to see previous group history you can view: https://github.com/ala-mn/Addressing-real-world-crime-and-security-problems-with-data-science.git
 
 ## Our goal
 The aim of this project was a vague problem to which we had to find a solution, how can we, as a team of Data Scientists and Computer Scientists help the London police force in reducing burglary rates. 
