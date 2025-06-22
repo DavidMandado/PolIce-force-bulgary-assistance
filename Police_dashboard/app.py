@@ -168,7 +168,7 @@ app.layout = html.Div([
             html.Div(
                 id="past-controls",
                 children=[
-                    html.Label("Date Range (Year)"),
+                    html.Label("Date Range"),
                     dcc.RangeSlider(
                         id="past-range",
                         min=2021,
