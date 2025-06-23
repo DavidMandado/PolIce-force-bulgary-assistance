@@ -47,26 +47,28 @@ Collects and visualises citizen's perceptions of safety, through open and closed
 * **What it does**
   * Responsive survey form (Likert + open-text).
   * Live charts of perceived-safety scores and topic sentiment versus borough averages.
+  * It always included sentiment analysis processing to extract frequent topics and mean sentiment in the survey's open questions.
 * **Tech stack:** plain HTML + JS (Plotly, D3) — no server needed once the processed CSVs are present.
 * **Run / deploy**
   1. Ensure `data/topic_sentiment_summary.csv` (and any other processed survey outputs) are in the `data/` folder.
   2. Open `community-tool/dashboard.html` in a browser.  
-     *Tip: host the folder on GitHub Pages or Netlify for a public deployment.*
-The most recommended method to view this part of the project is installing the Live Server extension and opening the index.html file with it.
+     *Tip: install the Live Server extension, right-click the index.html file and press "Open with Live Server".*
 
 
-### 🛡️ Police Dashboard
-An interactive Dash application for analysts and duty officers.
+
+### Police Dashboard
+An interactive Dash application for the London Police Force.
 
 * **Location:** `Police-dashboard/app.py`
 * **Main features**
   1. **Map view**  
      * Ward- or LSOA-level choropleths of burglary counts (historical **or** predicted).  
+     * Predicted vs. perceived safety heatmap view, normalized and computed difference to identify areas with gaps between perceived community safety and predicted safety.
      * Drill-down: click a ward to reveal constituent LSOAs plus a patrol allocation table.
   2. **Control panel**  
      * Toggle Past / Predicted data, pick date ranges, upload a new month of raw crime CSVs, download auto-generated patrol schedules.
   3. **Perception Analysis modal**  
-     * Pops up on demand to show community sentiment bars (and any extra visuals you wire in).
+     * Pops up on demand to show community sentiment top topics.
 * **Run locally**
   ```bash
   cd Police-dashboard
