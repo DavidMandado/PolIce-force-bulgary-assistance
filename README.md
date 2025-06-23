@@ -39,6 +39,7 @@ Police-dashboard/    &nbsp;&nbsp;     # Dash app for police users<br>
 Other files         &nbsp;&nbsp;            # Normalization, data exploration, etc.<br>
 
 ## Our SOLUTION - in detail
+For a few months, the whole thing will be available in policeallocation.live, if it is not there anymore, follow the instructions below.
 
 ### Community Tool
 Collects and visualises citizen's perceptions of safety, through open and closed questions.
@@ -54,7 +55,19 @@ Collects and visualises citizen's perceptions of safety, through open and closed
   2. Open `community-tool/dashboard.html` in a browser.  
      *Tip: install the Live Server extension, right-click the index.html file and press "Open with Live Server".*
 
+<details>
+<summary><strong>Click to view the community platform</strong></summary>
 
+<p align="center">
+  <img src="data/readme_files/mcblcommviz1.png"  width="45%">&nbsp;
+  <img src="data/readme_files/mcblcommviz2.png" width="45%">
+</p>
+<p align="center">
+  <img src="data/readme_files/mcblsurvery1.png"     width="45%">&nbsp;
+  <img src="data/readme_files/mcblsurvey2.png"     width="45%">
+</p>
+
+</details>
 
 ### Police Dashboard
 An interactive Dash application for the London Police Force.
@@ -74,3 +87,10 @@ An interactive Dash application for the London Police Force.
   cd Police-dashboard
   pip install -r requirements.txt     # Dash, Plotly, geopandas, xgboost, etc.
   python app.py
+
+### Predictive Model
+XGBoost regression at LSOA level.
+* Handles lags and rolling averages effectively for time-aware forecasting
+* Captures nonlinear patterns, including seasonality and interaction effects
+* Hyper-parameter optimization with Optuna.
+* Achieved R^2 = 0.764, with MAE = 0.131

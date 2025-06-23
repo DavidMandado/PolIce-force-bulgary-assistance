@@ -1,6 +1,28 @@
-streamlit
-pandas
-geopandas
-folium
-streamlit-folium
-sqlalchemy
+# ───────────────────────── Core numerical stack ───────────────────────── #
+pandas==2.2.2
+numpy==1.26.4
+scipy==1.13.0              # for entropy(), stats, etc.
+scikit-learn==1.5.0
+joblib==1.4.2
+
+# ───────────────────────── ML & tuning ────────────────────────────────── #
+xgboost==2.0.3
+optuna==3.6.0              # optional – only needed for hyper-parameter search
+tqdm==4.66.4               # nice progress bars (Optuna / training loops)
+
+# ───────────────────────── Dash / Plotly front-end ────────────────────── #
+dash==3.3.2
+dash-core-components==2.0.0   # packaged separately for PINNED installs
+dash-html-components==2.0.0
+dash-table==5.0.0
+plotly==5.21.0
+
+# ───────────────────────── Geo stack ──────────────────────────────────── #
+geopandas==0.15.2
+shapely==2.1.1
+pyproj==3.7.1
+fiona==1.9.6
+rtree==1.2.0                # spatial indexing (optional but speeds up sjoin)
+
+# ───────────────────────── Misc utilities ─────────────────────────────── #
+pyyaml==6.0.1               # config / meta if you add YAML files
