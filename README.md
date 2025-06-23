@@ -15,25 +15,25 @@ community-tool/            # Front-end for community survey and visualizations<b
 &nbsp;  ├─ index.html            # Main html structure of community website<br>
 &nbsp;  ├─ feedback.html         # Community survey page<br>
 &nbsp;  ├─ dashboard.html        # Community visualizations dashboard<br>
-  ├─ visuals.js            # JS for community visualizations<br>
-  ├─ script.js             # Interaction logic for survey<br>
-  └─ style.css             # Styles for community tool<br>
+&nbsp;  ├─ visuals.js            # JS for community visualizations<br>
+&nbsp;  ├─ script.js             # Interaction logic for survey<br>
+&nbsp;  └─ style.css             # Styles for community tool<br>
 
 data/                      # Input and output data files<br>
-  ├─ burglary_next_month_forecast.csv   # Model outputs (predicted burglaries)<br>
-  ├─ crime_fixed_data.csv               # Master historical burglary dataset<br>
-  ├─ topic_sentiment_summary.csv        # Processed community feedback by topic & sentiment<br>
-  ├─ LSOAs.geojson                      # Boundaries for LSOA polygon maps<br>
-  ├─ wards.geojson                      # Boundaries for London wards<br>
-  └─ ...                                # Other CSVs (population, stop-and-search, IMD, etc.)<br>
+&nbsp;  ├─ burglary_next_month_forecast.csv   # Model outputs (predicted burglaries)<br>
+&nbsp;  ├─ crime_fixed_data.csv               # Master historical burglary dataset<br>
+&nbsp;  ├─ topic_sentiment_summary.csv        # Processed community feedback by topic & sentiment<br>
+&nbsp;  ├─ LSOAs.geojson                      # Boundaries for LSOA polygon maps<br>
+&nbsp;  ├─ wards.geojson                      # Boundaries for London wards<br>
+&nbsp;  └─ ...                                # Other CSVs (population, stop-and-search, IMD, etc.)<br>
 
 models/                    # Model artifacts and training code<br>
-  ├─ xgb_burglary_model.pkl             # Trained XGBoost model<br>
-  ├─ robust_scaler.pkl                  # Scaler for feature preprocessing<br>
+&nbsp;  ├─ xgb_burglary_model.pkl             # Trained XGBoost model<br>
+&nbsp;  ├─ robust_scaler.pkl                  # Scaler for feature preprocessing<br>
 
 Police-dashboard/         # Dash app for police users<br>
-  ├─ app.py                     # Main Dash application code<br>
-  ├─ helper.py                  # Utilities (prediction saving, spatial joins)<br>
-  ├─ process_data.py            # Upload data function process file<br>
+&nbsp;  ├─ app.py                     # Main Dash application code<br>
+&nbsp;  ├─ helper.py                  # Utilities (prediction saving, spatial joins)<br>
+&nbsp;  ├─ process_data.py            # Upload data function process file<br>
 
 Other files                     # Normalization, data exploration, etc.<br>
