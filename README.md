@@ -113,6 +113,16 @@ XGBoost regression at LSOA level.
 * Hyper-parameter optimization with Optuna.
 * Achieved R^2 = 0.764, with MAE = 0.131
 
+<div align="center">
+
+| Split | **MAE** | **RMSE** | **R²** |
+|-------|-------:|--------:|------:|
+| **Train**      | 0.130 | 0.369 | 0.862 |
+| **Validation** | 0.136 | 0.436 | 0.774 |
+| **Test**       | 0.131 | 0.431 | 0.764 |
+
+</div>
+
 ## Data Sources (all public)
 
 | Dataset | Repo File(s) | Original Source | Notes |
