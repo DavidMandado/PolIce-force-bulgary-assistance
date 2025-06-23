@@ -37,3 +37,38 @@ Police-dashboard/    &nbsp;&nbsp;     # Dash app for police users<br>
 &nbsp;  ├─ process_data.py   &nbsp;&nbsp;         # Upload data function process file<br>
 
 Other files         &nbsp;&nbsp;            # Normalization, data exploration, etc.<br>
+
+## Our SOLUTION - in detail
+
+### Community Tool
+Collects and visualises citizen's perceptions of safety, through open and closed questions.
+
+* **Location:** `community-tool/`
+* **What it does**
+  * Responsive survey form (Likert + open-text).
+  * Live charts of perceived-safety scores and topic sentiment versus borough averages.
+* **Tech stack:** plain HTML + JS (Plotly, D3) — no server needed once the processed CSVs are present.
+* **Run / deploy**
+  1. Ensure `data/topic_sentiment_summary.csv` (and any other processed survey outputs) are in the `data/` folder.
+  2. Open `community-tool/dashboard.html` in a browser.  
+     *Tip: host the folder on GitHub Pages or Netlify for a public deployment.*
+The most recommended method to view this part of the project is installing the Live Server extension and opening the index.html file with it.
+
+
+### 🛡️ Police Dashboard
+An interactive Dash application for analysts and duty officers.
+
+* **Location:** `Police-dashboard/app.py`
+* **Main features**
+  1. **Map view**  
+     * Ward- or LSOA-level choropleths of burglary counts (historical **or** predicted).  
+     * Drill-down: click a ward to reveal constituent LSOAs plus a patrol allocation table.
+  2. **Control panel**  
+     * Toggle Past / Predicted data, pick date ranges, upload a new month of raw crime CSVs, download auto-generated patrol schedules.
+  3. **Perception Analysis modal**  
+     * Pops up on demand to show community sentiment bars (and any extra visuals you wire in).
+* **Run locally**
+  ```bash
+  cd Police-dashboard
+  pip install -r requirements.txt     # Dash, Plotly, geopandas, xgboost, etc.
+  python app.py
