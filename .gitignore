@@ -203,7 +203,6 @@ cython_debug/
 *.db
 *.sqlite
 *.sqlite3
-data/
 models/
 .gitignore
 .DS_Store
