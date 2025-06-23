@@ -88,6 +88,9 @@ An interactive Dash application for the London Police Force.
   pip install -r requirements.txt     # Dash, Plotly, geopandas, xgboost, etc.
   python app.py
 
+<details>
+<summary><strong>Click to view the police platform</strong></summary>
+
 <p align="center">
   <img src="data/readme_files/mcblpd1.png"  width="45%">&nbsp;
   <img src="data/readme_files/mcblpd2.png" width="45%">
@@ -100,6 +103,8 @@ An interactive Dash application for the London Police Force.
   <img src="data/readme_files/mcblpd5.png"     width="45%">&nbsp;
   <img src="data/readme_files/mcblpd6.png"     width="45%">
 </p>
+
+</details>
 
 ### Predictive Model
 XGBoost regression at LSOA level.
