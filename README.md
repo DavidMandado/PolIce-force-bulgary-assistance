@@ -12,9 +12,9 @@ The most obvious solution was predicting burglaries for future month(s). However
 ## Project Structure
 
 community-tool/            # Front-end for community survey and visualizations<br>
-  ├─ index.html            # Main html structure of community website<br>
-  ├─ feedback.html         # Community survey page<br>
-  ├─ dashboard.html        # Community visualizations dashboard<br>
+&nbsp;  ├─ index.html            # Main html structure of community website<br>
+&nbsp;  ├─ feedback.html         # Community survey page<br>
+&nbsp;  ├─ dashboard.html        # Community visualizations dashboard<br>
   ├─ visuals.js            # JS for community visualizations<br>
   ├─ script.js             # Interaction logic for survey<br>
   └─ style.css             # Styles for community tool<br>
