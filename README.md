@@ -11,29 +11,29 @@ The most obvious solution was predicting burglaries for future month(s). However
 
 ## Project Structure
 
-community-tool/            # Front-end for community survey and visualizations<br>
-&nbsp;  ├─ index.html            # Main html structure of community website<br>
-&nbsp;  ├─ feedback.html         # Community survey page<br>
-&nbsp;  ├─ dashboard.html        # Community visualizations dashboard<br>
-&nbsp;  ├─ visuals.js            # JS for community visualizations<br>
-&nbsp;  ├─ script.js             # Interaction logic for survey<br>
-&nbsp;  └─ style.css             # Styles for community tool<br>
+community-tool/   &nbsp;&nbsp;         # Front-end for community survey and visualizations<br>
+&nbsp;  ├─ index.html  &nbsp;&nbsp;          # Main html structure of community website<br>
+&nbsp;  ├─ feedback.html   &nbsp;&nbsp;      # Community survey page<br>
+&nbsp;  ├─ dashboard.html  &nbsp;&nbsp;      # Community visualizations dashboard<br>
+&nbsp;  ├─ visuals.js    &nbsp;&nbsp;        # JS for community visualizations<br>
+&nbsp;  ├─ script.js   &nbsp;&nbsp;          # Interaction logic for survey<br>
+&nbsp;  └─ style.css   &nbsp;&nbsp;          # Styles for community tool<br>
 
-data/                      # Input and output data files<br>
-&nbsp;  ├─ burglary_next_month_forecast.csv   # Model outputs (predicted burglaries)<br>
-&nbsp;  ├─ crime_fixed_data.csv               # Master historical burglary dataset<br>
-&nbsp;  ├─ topic_sentiment_summary.csv        # Processed community feedback by topic & sentiment<br>
-&nbsp;  ├─ LSOAs.geojson                      # Boundaries for LSOA polygon maps<br>
-&nbsp;  ├─ wards.geojson                      # Boundaries for London wards<br>
-&nbsp;  └─ ...                                # Other CSVs (population, stop-and-search, IMD, etc.)<br>
+data/         &nbsp;&nbsp;             # Input and output data files<br>
+&nbsp;  ├─ burglary_next_month_forecast.csv &nbsp;&nbsp;  # Model outputs (predicted burglaries)<br>
+&nbsp;  ├─ crime_fixed_data.csv         &nbsp;&nbsp;      # Master historical burglary dataset<br>
+&nbsp;  ├─ topic_sentiment_summary.csv    &nbsp;&nbsp;    # Processed community feedback by topic & sentiment<br>
+&nbsp;  ├─ LSOAs.geojson      &nbsp;&nbsp;                # Boundaries for LSOA polygon maps<br>
+&nbsp;  ├─ wards.geojson     &nbsp;&nbsp;                 # Boundaries for London wards<br>
+&nbsp;  └─ ...              &nbsp;&nbsp;                  # Other CSVs (population, stop-and-search, IMD, etc.)<br>
 
-models/                    # Model artifacts and training code<br>
-&nbsp;  ├─ xgb_burglary_model.pkl             # Trained XGBoost model<br>
-&nbsp;  ├─ robust_scaler.pkl                  # Scaler for feature preprocessing<br>
+models/            &nbsp;&nbsp;        # Model artifacts and training code<br>
+&nbsp;  ├─ xgb_burglary_model.pkl   &nbsp;&nbsp;          # Trained XGBoost model<br>
+&nbsp;  ├─ robust_scaler.pkl     &nbsp;&nbsp;             # Scaler for feature preprocessing<br>
 
-Police-dashboard/         # Dash app for police users<br>
-&nbsp;  ├─ app.py                     # Main Dash application code<br>
-&nbsp;  ├─ helper.py                  # Utilities (prediction saving, spatial joins)<br>
-&nbsp;  ├─ process_data.py            # Upload data function process file<br>
+Police-dashboard/    &nbsp;&nbsp;     # Dash app for police users<br>
+&nbsp;  ├─ app.py        &nbsp;&nbsp;             # Main Dash application code<br>
+&nbsp;  ├─ helper.py     &nbsp;&nbsp;             # Utilities (prediction saving, spatial joins)<br>
+&nbsp;  ├─ process_data.py   &nbsp;&nbsp;         # Upload data function process file<br>
 
-Other files                     # Normalization, data exploration, etc.<br>
+Other files         &nbsp;&nbsp;            # Normalization, data exploration, etc.<br>
