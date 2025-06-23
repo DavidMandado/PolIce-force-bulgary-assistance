@@ -39,7 +39,7 @@ Police-dashboard/    &nbsp;&nbsp;     # Dash app for police users<br>
 Other files         &nbsp;&nbsp;            # Normalization, data exploration, etc.<br>
 
 ## Our SOLUTION - in detail
-For a few months, the whole thing will be available in policeallocation.live, if it is not there anymore, follow the instructions below.
+For a few months, the application will be available at https://policeallocation.live, if it is not there anymore, follow the instructions below.
 
 ### Community Tool
 Collects and visualises citizen's perceptions of safety, through open and closed questions.
