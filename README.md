@@ -11,29 +11,29 @@ The most obvious solution was predicting burglaries for future month(s). However
 
 ## Project Structure
 
-community-tool/            # Front-end for community survey and visualizations
-  ├─ index.html            # Main html structure of community website
-  ├─ feedback.html         # Community survey page
-  ├─ dashboard.html        # Community visualizations dashboard
-  ├─ visuals.js            # JS for community visualizations
-  ├─ script.js             # Interaction logic for survey
-  └─ style.css             # Styles for community tool
+community-tool/            # Front-end for community survey and visualizations<br>
+  ├─ index.html            # Main html structure of community website<br>
+  ├─ feedback.html         # Community survey page<br>
+  ├─ dashboard.html        # Community visualizations dashboard<br>
+  ├─ visuals.js            # JS for community visualizations<br>
+  ├─ script.js             # Interaction logic for survey<br>
+  └─ style.css             # Styles for community tool<br>
 
-data/                      # Input and output data files
-  ├─ burglary_next_month_forecast.csv   # Model outputs (predicted burglaries)
-  ├─ crime_fixed_data.csv               # Master historical burglary dataset
-  ├─ topic_sentiment_summary.csv        # Processed community feedback by topic & sentiment
-  ├─ LSOAs.geojson                      # Boundaries for LSOA polygon maps
-  ├─ wards.geojson                      # Boundaries for London wards
-  └─ ...                                # Other CSVs (population, stop-and-search, IMD, etc.)
+data/                      # Input and output data files<br>
+  ├─ burglary_next_month_forecast.csv   # Model outputs (predicted burglaries)<br>
+  ├─ crime_fixed_data.csv               # Master historical burglary dataset<br>
+  ├─ topic_sentiment_summary.csv        # Processed community feedback by topic & sentiment<br>
+  ├─ LSOAs.geojson                      # Boundaries for LSOA polygon maps<br>
+  ├─ wards.geojson                      # Boundaries for London wards<br>
+  └─ ...                                # Other CSVs (population, stop-and-search, IMD, etc.)<br>
 
-models/                    # Model artifacts and training code
-  ├─ xgb_burglary_model.pkl             # Trained XGBoost model
-  ├─ robust_scaler.pkl                  # Scaler for feature preprocessing
+models/                    # Model artifacts and training code<br>
+  ├─ xgb_burglary_model.pkl             # Trained XGBoost model<br>
+  ├─ robust_scaler.pkl                  # Scaler for feature preprocessing<br>
 
-Police-dashboard/         # Dash app for police users
-  ├─ app.py                     # Main Dash application code
-  ├─ helper.py                  # Utilities (prediction saving, spatial joins)
-  ├─ process_data.py            # Upload data function process file
+Police-dashboard/         # Dash app for police users<br>
+  ├─ app.py                     # Main Dash application code<br>
+  ├─ helper.py                  # Utilities (prediction saving, spatial joins)<br>
+  ├─ process_data.py            # Upload data function process file<br>
 
-Other files                     # Normalization, data exploration, etc.
+Other files                     # Normalization, data exploration, etc.<br>
