@@ -4,6 +4,8 @@ TU/e Multidisciplinary CBL, helping London police force reduce burlgary rates by
 This README will give the information necessary to run the project and a summary of its content. This repository was created due to many members having issues in the git history after pushing big data files. This is the second repository used in the project, in which the previous problem was avoided using a detailed gitignore file. To access the previous repository to see previous group history you can view: <br>
 -> https://github.com/ala-mn/Addressing-real-world-crime-and-security-problems-with-data-science.git
 
+You can check all of our progress and reasoning in the Allocating_London_Police_Forces_Through_Predictive_Burglary_Rates uploaded to the root folder.
+
 ## Our GOAL
 The aim of this project was a vague problem to which we had to find a solution, how can we, as a team of Data Scientists and Computer Scientists help the London police force in reducing burglary rates. 
 
