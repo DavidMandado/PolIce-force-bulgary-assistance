@@ -74,6 +74,7 @@ An interactive Dash application for the London Police Force.
 
 * **Location:** `Police-dashboard/app.py`
 * **Main features**
+    * Developed with python (dash) and basic HTML and CSS
   1. **Map view**  
      * Ward- or LSOA-level choropleths of burglary counts (historical **or** predicted).  
      * Predicted vs. perceived safety heatmap view, normalized and computed difference to identify areas with gaps between perceived community safety and predicted safety.
