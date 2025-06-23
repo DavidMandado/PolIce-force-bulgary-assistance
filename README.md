@@ -1,7 +1,7 @@
 # PolIce force bulgary assistance - Fighting to reduce residential burglary
-TU/e Multidisciplinary CBL, helping London police force reduce burlgary rates by predicting crime, allocating their police officers and adding our original twist by including the community in our innovative solution.
+TU/e Multidisciplinary CBL, helping London police force reduce burlgary rates by predicting crime, allocating their police officers and adding taking community feedback into account for our insights.
 
-This README will give the information necessary to run the project and a summary of its content. This repository was created due to many members having issues in the git history after pushing big data files. This is the second repository used in the project, avoiding the previous problem using a detailed gitignore file. To access the previous repository to see previous group history you can view: 
+This README will give the information necessary to run the project and a summary of its content. This repository was created due to many members having issues in the git history after pushing big data files. This is the second repository used in the project, in which the previous problem was avoided using a detailed gitignore file. To access the previous repository to see previous group history you can view: <br>
 -> https://github.com/ala-mn/Addressing-real-world-crime-and-security-problems-with-data-science.git
 
 ## Our GOAL
@@ -80,7 +80,7 @@ An interactive Dash application for the London Police Force.
      * Predicted vs. perceived safety heatmap view, normalized and computed difference to identify areas with gaps between perceived community safety and predicted safety.
      * Drill-down: click a ward to reveal constituent LSOAs plus a patrol allocation table.
   2. **Control panel**  
-     * Toggle Past / Predicted data, pick date ranges, upload a new month of raw crime CSVs, download auto-generated patrol schedules.
+     * Toggle Past / Predicted data, pick date ranges, upload a new month of raw crime CSVs, run the model with new predictions, download auto-generated patrol schedules.
   3. **Perception Analysis modal**  
      * Pops up on demand to show community sentiment top topics.
 * **Run locally**
